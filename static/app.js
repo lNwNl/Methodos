@@ -62,21 +62,6 @@ function render(data) {
         createdBy: node.created_by,
         nodeId: node.id,
       },
-      style: {
-        'background-color': COLORS[node.created_by] || '#6b7280',
-        'border-width': 2,
-        'border-color': '#1f2937',
-        'font-size': '11px',
-        'text-wrap': 'wrap',
-        'text-max-width': '180px',
-        'text-valign': 'center',
-        'text-halign': 'center',
-        'color': '#d1d5db',
-        'width': 'label',
-        'height': 'label',
-        'padding': '10px',
-        'shape': 'round-rectangle',
-      },
     });
   }
 
@@ -124,7 +109,32 @@ function render(data) {
     style: [
       {
         selector: 'node',
-        style: { 'label': 'data(label)' },
+        style: {
+          'label': 'data(label)',
+          'background-color': '#6b7280',
+          'border-width': 2,
+          'border-color': '#1f2937',
+          'font-size': '11px',
+          'text-wrap': 'wrap',
+          'text-max-width': '180px',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'color': '#d1d5db',
+          'padding': '10px',
+          'shape': 'round-rectangle',
+        },
+      },
+      {
+        selector: 'node[createdBy="human"]',
+        style: { 'background-color': '#3b82f6' },
+      },
+      {
+        selector: 'node[createdBy="agent"]',
+        style: { 'background-color': '#10b981' },
+      },
+      {
+        selector: 'node[createdBy="system"]',
+        style: { 'background-color': '#ef4444' },
       },
       {
         selector: '.resulted',
