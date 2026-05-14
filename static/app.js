@@ -1,287 +1,209 @@
-const params = new URLSearchParams(window.location.search);
-const projectId = params.get('id');
-
-if (!projectId) {
-  document.body.innerHTML = '<div class="flex items-center justify-center min-h-screen text-gray-400">缺少项目 ID</div>';
-  throw new Error('Missing project id');
-}
-
-const COLORS = {
-  human: '#3b82f6',
-  agent: '#10b981',
-  system: '#ef4444',
+const STATUS = {
+  active:  { cls: 'bg-emerald-900/50 text-emerald-400 border-emerald-800', label: '活跃' },
+  completed: { cls: 'bg-blue-900/50 text-blue-400 border-blue-800',    label: '完成' },
+  failed:   { cls: 'bg-red-900/50 text-red-400 border-red-800',        label: '失败' },
+  stopped:  { cls: 'bg-gray-800 text-gray-400 border-gray-700',        label: '已暂停' },
 };
 
-let cy;
+const { createApp } = Vue;
 
-async function loadProject() {
-  const res = await fetch(`/projects/${projectId}`);
-  if (!res.ok) {
-    document.body.innerHTML = '<div class="flex items-center justify-center min-h-screen text-gray-400">项目不存在</div>';
-    return;
-  }
-  const data = await res.json();
-  render(data);
-  setupButtons(data);
-}
+createApp({
+  data() {
+    return {
+      projects: [],
+      loading: true,
+      error: '',
+      showModal: false,
+      form: { title: '', agent_type: 'mock' },
+      submitting: false,
+      agents: [],
+    };
+  },
 
-function setupButtons(data) {
-  const stopBtn = document.getElementById('stop-btn');
-  const pushBtn = document.getElementById('push-btn');
-  const summaryBar = document.getElementById('summary-bar');
-  const badge = document.getElementById('status-badge');
+  async mounted() {
+    await this.fetchMode();
+    this.fetchProjects();
+    this._timer = setInterval(() => this.fetchProjects(), 2000);
+  },
 
-  const statusMap = {
-    active: { cls: 'bg-emerald-900/50 text-emerald-400 border-emerald-800', label: '活跃' },
-    completed: { cls: 'bg-blue-900/50 text-blue-400 border-blue-800', label: '完成' },
-    failed: { cls: 'bg-red-900/50 text-red-400 border-red-800', label: '失败' },
-    stopped: { cls: 'bg-gray-800 text-gray-400 border-gray-700', label: '已暂停' },
-  };
-  const s = statusMap[data.status] || statusMap.active;
-  const isPlanning = data.status === 'active' && !data.last_plan_at && data.edges.length === 0;
-  badge.className = `px-2.5 py-1 rounded-full text-xs font-medium border ${s.cls}${isPlanning ? ' animate-pulse' : ''}`;
-  badge.textContent = isPlanning ? '▊ Plan 推理中…' : s.label;
+  beforeUnmount() {
+    clearInterval(this._timer);
+  },
 
-  if (data.status === 'active') {
-    stopBtn.classList.remove('hidden');
-    stopBtn.setAttribute('hx-post', `/projects/${projectId}/stop`);
-    stopBtn.setAttribute('hx-ext', 'json-enc');
-    htmx.process(stopBtn);
-    pushBtn.classList.add('hidden');
-  } else if (data.status === 'stopped' || data.status === 'failed') {
-    pushBtn.classList.remove('hidden');
-    stopBtn.classList.add('hidden');
-  } else if (data.status === 'completed') {
-    summaryBar.classList.remove('hidden');
-    document.getElementById('summary-text').textContent = data.summary || '';
-    pushBtn.classList.remove('hidden');
-    stopBtn.classList.add('hidden');
-  }
-}
-
-function render(data) {
-  const elements = [];
-
-  const nodeIdsInEdges = new Set();
-  for (const edge of data.edges) {
-    for (const nid of edge.from_node_ids) nodeIdsInEdges.add(nid);
-    for (const nid of edge.to_node_ids) nodeIdsInEdges.add(nid);
-  }
-
-  for (const node of data.nodes) {
-    elements.push({
-      data: {
-        id: `n${node.id}`,
-        label: truncate(node.description, 60),
-        createdBy: node.created_by,
-        nodeId: node.id,
-      },
-    });
-  }
-
-  for (const edge of data.edges) {
-    const isResulted = edge.to_node_ids.length > 0;
-    for (const fromId of edge.from_node_ids) {
-      for (const toId of edge.to_node_ids) {
-        elements.push({
-          data: {
-            id: `e${edge.id}_${fromId}_${toId}`,
-            source: `n${fromId}`,
-            target: `n${toId}`,
-            label: truncate(edge.direction_description, 40),
-            edgeId: edge.id,
-            failureCount: edge.failure_count,
-          },
-          classes: isResulted ? 'resulted' : 'pending',
-        });
-      }
-      if (!isResulted) {
-        elements.push({
-          data: {
-            id: `e${edge.id}_pending`,
-            source: `n${fromId}`,
-            target: `n${fromId}`,
-            label: truncate(edge.direction_description, 40),
-            edgeId: edge.id,
-            failureCount: edge.failure_count,
-            pending: true,
-          },
-          classes: 'pending',
-        });
-      }
-    }
-  }
-
-  const evidenceIds = data.evidence_node_ids || [];
-  const evidenceSet = new Set(evidenceIds.map(id => `n${id}`));
-
-  if (cy) cy.destroy();
-
-  cy = cytoscape({
-    container: document.getElementById('graph'),
-    elements,
-    style: [
-      {
-        selector: 'node',
-        style: {
-          'label': 'data(label)',
-          'background-color': '#6b7280',
-          'border-width': 2,
-          'border-color': '#1f2937',
-          'font-size': '11px',
-          'text-wrap': 'wrap',
-          'text-max-width': '180px',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          'color': '#d1d5db',
-          'padding': '10px',
-          'shape': 'round-rectangle',
-        },
-      },
-      {
-        selector: 'node[createdBy="human"]',
-        style: { 'background-color': '#3b82f6' },
-      },
-      {
-        selector: 'node[createdBy="agent"]',
-        style: { 'background-color': '#10b981' },
-      },
-      {
-        selector: 'node[createdBy="system"]',
-        style: { 'background-color': '#ef4444' },
-      },
-      {
-        selector: '.resulted',
-        style: {
-          'width': 2,
-          'line-color': '#4b5563',
-          'target-arrow-color': '#4b5563',
-          'target-arrow-shape': 'triangle',
-          'curve-style': 'bezier',
-          'font-size': '9px',
-          'color': '#6b7280',
-          'text-rotation': 'autorotate',
-        },
-      },
-      {
-        selector: '.pending',
-        style: {
-          'width': 1.5,
-          'line-color': '#6b7280',
-          'line-style': 'dashed',
-          'curve-style': 'bezier',
-          'font-size': '9px',
-          'color': '#6b7280',
-        },
-      },
-      {
-        selector: '.evidence',
-        style: {
-          'border-color': '#fbbf24',
-          'border-width': 3,
-        },
-      },
-    ],
-    layout: {
-      name: 'dagre',
-      rankDir: 'TB',
-      spacingFactor: 1.5,
-      nodeDimensionsIncludeLabels: true,
+  methods: {
+    async fetchMode() {
+      try {
+        const r = await fetch('/mode');
+        const { docker } = await r.json();
+        this.agents = docker
+          ? [{ value: 'opencode', label: 'OpenCode' }, { value: 'mock', label: 'Mock（测试）' }]
+          : [{ value: 'mock', label: 'Mock（测试）' }];
+        this.form.agent_type = this.agents[0].value;
+      } catch {}
     },
-  });
 
-  for (const id of evidenceSet) {
-    const node = cy.getElementById(id);
-    if (node.length) node.addClass('evidence');
-  }
+    async fetchProjects() {
+      try {
+        const r = await fetch('/projects');
+        if (!r.ok) throw new Error(r.status);
+        this.projects = await r.json();
+        this.error = '';
+      } catch (e) {
+        this.error = '无法加载项目列表';
+      } finally {
+        this.loading = false;
+      }
+    },
 
-  cy.on('tap', 'node', (evt) => {
-    const node = evt.target;
-    showDetail('node', node.data());
-  });
+    async createProject() {
+      if (!this.form.title.trim()) return;
+      this.submitting = true;
+      try {
+        const r = await fetch('/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: this.form.title, agent_type: this.form.agent_type }),
+        });
+        if (!r.ok) {
+          const { error } = await r.json();
+          throw new Error(error || r.status);
+        }
+        this.showModal = false;
+        this.form.title = '';
+        this.fetchProjects();
+      } catch (e) {
+        alert(`创建失败: ${e.message}`);
+      } finally {
+        this.submitting = false;
+      }
+    },
 
-  cy.on('tap', 'edge', (evt) => {
-    const edge = evt.target;
-    showDetail('edge', edge.data());
-  });
+    async stopProject(id) {
+      try {
+        await fetch(`/projects/${id}/stop`, { method: 'POST' });
+        this.fetchProjects();
+      } catch (e) {
+        alert(`暂停失败: ${e.message}`);
+      }
+    },
 
-  setTimeout(() => loadProject(), 2000);
-}
+    async pushProject(id) {
+      try {
+        await fetch(`/projects/${id}/push`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nodes: [] }),
+        });
+        this.fetchProjects();
+      } catch (e) {
+        alert(`推进失败: ${e.message}`);
+      }
+    },
 
-function showDetail(type, data) {
-  const panel = document.getElementById('detail-panel');
-  const title = document.getElementById('detail-title');
-  const body = document.getElementById('detail-body');
+    isPlanning(p) {
+      return p.status === 'active' && !p.last_plan_at && p.edge_total === 0;
+    },
 
-  panel.classList.remove('hidden');
+    statusLabel(p) {
+      if (this.isPlanning(p)) return '推理中';
+      return (STATUS[p.status] || STATUS.active).label;
+    },
 
-  if (type === 'node') {
-    title.innerHTML = `<span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background:${COLORS[data.createdBy] || '#6b7280'}"></span>Node #${data.nodeId}`;
-    body.innerHTML = `
-      <p class="mb-1"><span class="text-gray-500">来源:</span> ${data.createdBy}</p>
-      <p class="whitespace-pre-wrap">${data.label}</p>
-    `;
-  } else if (type === 'edge') {
-    const style = data.pending ? 'text-amber-400' : 'text-gray-400';
-    title.textContent = `Edge #${data.edgeId}`;
-    body.innerHTML = `
-      <p class="mb-1"><span class="text-gray-500">状态:</span> <span class="${style}">${data.pending ? '待执行' : '已完成'}</span></p>
-      ${data.failureCount > 0 ? `<p class="mb-1 text-red-400">失败次数: ${data.failureCount}</p>` : ''}
-      <p class="whitespace-pre-wrap">${data.label}</p>
-    `;
-  }
+    statusClass(p) {
+      const base = (STATUS[p.status] || STATUS.active).cls;
+      return `${base}${this.isPlanning(p) ? ' animate-pulse' : ''}`;
+    },
 
-  setTimeout(() => {
-    if (cy) { cy.resize(); cy.fit(); }
-  }, 50);
-}
+    formatTitle(s) {
+      return (s || '').length > 60 ? s.slice(0, 60) + '...' : s;
+    },
+  },
 
-function truncate(text, max) {
-  if (!text) return '';
-  return text.length > max ? text.slice(0, max) + '...' : text;
-}
-
-function showPushModal() {
-  document.getElementById('push-modal').classList.remove('hidden');
-  document.getElementById('push-nodes').innerHTML = `
-    <div class="push-node-field">
-      <textarea name="description" rows="2"
-        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 resize-none mb-2"
-        placeholder="输入新的信息..."></textarea>
+  template: `
+  <div class="max-w-5xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-8">
+      <h1 class="text-2xl font-bold tracking-tight">Methodos</h1>
+      <button @click="showModal = true"
+        class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        + 新建项目
+      </button>
     </div>
-  `;
-}
 
-function addPushNode() {
-  const container = document.getElementById('push-nodes');
-  const div = document.createElement('div');
-  div.className = 'push-node-field';
-  div.innerHTML = `
-    <textarea name="description" rows="2"
-      class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 resize-none mb-2"
-      placeholder="输入新的信息..."></textarea>
-  `;
-  container.appendChild(div);
-}
+    <!-- Create modal -->
+    <Transition name="fade">
+    <div v-if="showModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showModal = false">
+      <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md mx-4">
+        <h2 class="text-lg font-semibold mb-4">新建项目</h2>
+        <form @submit.prevent="createProject">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">描述</label>
+              <textarea v-model="form.title" rows="2" required
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 resize-none"
+                placeholder="帮我拿到 flag。https://hackme.com"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">Agent 类型</label>
+              <select v-model="form.agent_type" required
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                <option v-for="a in agents" :key="a.value" :value="a.value">{{ a.label }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex justify-end gap-3 mt-6">
+            <button type="button" @click="showModal = false"
+              class="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">取消</button>
+            <button type="submit" :disabled="submitting"
+              class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+              {{ submitting ? '创建中...' : '创建' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    </Transition>
 
-document.getElementById('push-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const textareas = document.querySelectorAll('#push-nodes textarea');
-  const nodes = [];
-  for (const ta of textareas) {
-    if (ta.value.trim()) {
-      nodes.push({ description: ta.value.trim() });
-    }
-  }
+    <!-- Loading -->
+    <div v-if="loading" class="text-center text-gray-500 py-12">
+      <div class="inline-block w-5 h-5 border-2 border-gray-600 border-t-emerald-400 rounded-full animate-spin mr-2 align-middle"></div>
+      加载中...
+    </div>
 
-  await fetch(`/projects/${projectId}/push`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nodes }),
-  });
+    <!-- Error -->
+    <div v-else-if="error" class="text-center text-red-400 py-12">{{ error }}</div>
 
-  document.getElementById('push-modal').classList.add('hidden');
-  loadProject();
-});
+    <!-- Project list -->
+    <div v-else class="space-y-3">
+      <div v-if="projects.length === 0" class="text-center text-gray-500 py-12">暂无项目，点击上方按钮创建</div>
 
-loadProject();
+      <div v-for="p in projects" :key="p.id"
+        class="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-700 transition-colors">
+        <div class="flex items-center justify-between">
+          <div class="flex-1 min-w-0">
+            <a :href="'/project.html?id=' + p.id" class="text-base font-medium hover:text-emerald-400 truncate block">
+              {{ formatTitle(p.title) }}
+            </a>
+            <div class="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-gray-500">
+              <span :class="'px-2 py-0.5 rounded-full text-xs border ' + statusClass(p)">{{ statusLabel(p) }}</span>
+              <span>Nodes: {{ p.node_count }}</span>
+              <span>Edges: {{ p.edge_total }}</span>
+              <span v-if="p.edge_unresulted > 0" class="text-amber-400">待处理: {{ p.edge_unresulted }}</span>
+              <span v-if="p.edge_inflight > 0" class="text-blue-400">执行中: {{ p.edge_inflight }}</span>
+            </div>
+          </div>
+          <div class="flex gap-2 ml-4 shrink-0">
+            <button v-if="p.status === 'active'" @click="stopProject(p.id)"
+              class="px-3 py-1.5 text-xs rounded-lg bg-amber-900/50 text-amber-400 hover:bg-amber-900 border border-amber-800 transition-colors">
+              暂停
+            </button>
+            <button v-if="p.status !== 'active'" @click="pushProject(p.id)"
+              class="px-3 py-1.5 text-xs rounded-lg bg-blue-900/50 text-blue-400 hover:bg-blue-900 border border-blue-800 transition-colors">
+              推进
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  `,
+}).mount('#app');
