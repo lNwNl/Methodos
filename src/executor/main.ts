@@ -2,6 +2,7 @@ import { initDb, getRawDb } from '../db/connection';
 import { createProject } from '../db/operations';
 import { MockAgentDriver } from '../driver/mock';
 import { createLoop } from './loop';
+import { startServer } from '../api/server';
 import type { PlanOutput } from '../driver/types';
 
 initDb();
@@ -30,45 +31,49 @@ const now = new Date().toISOString();
 const projectId = createProject(db, '帮我拿到 flag。https://hackme.com', 'mock', 'mock:v1', now);
 
 console.log(`Project ${projectId} created with title: "帮我拿到 flag。https://hackme.com"`);
-console.log('Starting executor loop...');
 
-const { start } = createLoop(db, driver);
-const stop = start();
+// Start HTTP server
+const PORT = parseInt(process.env.PORT || '3000', 10);
+startServer(db, PORT).then(() => {
+  console.log('Starting executor loop...');
+  const { start } = createLoop(db, driver);
+  const stop = start();
 
-let tickCount = 0;
-const watcher = setInterval(() => {
-  tickCount++;
-  const project = db.prepare('SELECT status, summary FROM projects WHERE id = ?').get(projectId) as any;
-  const nodeCount = (db.prepare('SELECT COUNT(*) as c FROM nodes WHERE project_id = ?').get(projectId) as any).c;
-  const edgeCount = (db.prepare('SELECT COUNT(*) as c FROM edges WHERE project_id = ?').get(projectId) as any).c;
+  let tickCount = 0;
+  const watcher = setInterval(() => {
+    tickCount++;
+    const project = db.prepare('SELECT status, summary FROM projects WHERE id = ?').get(projectId) as any;
+    const nodeCount = (db.prepare('SELECT COUNT(*) as c FROM nodes WHERE project_id = ?').get(projectId) as any).c;
+    const edgeCount = (db.prepare('SELECT COUNT(*) as c FROM edges WHERE project_id = ?').get(projectId) as any).c;
 
-  console.log(`[${tickCount}s] Status: ${project.status} | Nodes: ${nodeCount} | Edges: ${edgeCount}`);
+    console.log(`[${tickCount}s] Status: ${project.status} | Nodes: ${nodeCount} | Edges: ${edgeCount}`);
 
-  if (project.status === 'completed') {
-    console.log(`\nProject completed!`);
-    console.log(`Summary: ${project.summary}`);
+    if (project.status === 'completed') {
+      console.log(`\nProject completed!`);
+      console.log(`Summary: ${project.summary}`);
+      stop();
+      clearInterval(watcher);
+      process.exit(0);
+    }
+
+    if (project.status === 'failed') {
+      console.log(`\nProject failed.`);
+      stop();
+      clearInterval(watcher);
+      process.exit(1);
+    }
+
+    if (tickCount > 30) {
+      console.log(`\nTimeout after 30 seconds.`);
+      stop();
+      clearInterval(watcher);
+      process.exit(1);
+    }
+  }, 1000);
+
+  process.on('SIGINT', () => {
     stop();
     clearInterval(watcher);
     process.exit(0);
-  }
-
-  if (project.status === 'failed') {
-    console.log(`\nProject failed.`);
-    stop();
-    clearInterval(watcher);
-    process.exit(1);
-  }
-
-  if (tickCount > 30) {
-    console.log(`\nTimeout after 30 seconds.`);
-    stop();
-    clearInterval(watcher);
-    process.exit(1);
-  }
-}, 1000);
-
-process.on('SIGINT', () => {
-  stop();
-  clearInterval(watcher);
-  process.exit(0);
+  });
 });

@@ -268,3 +268,77 @@ export function setProjectLastPlanAt(
     WHERE id = ?
   `).run(ts, ts, projectId);
 }
+
+export function listProjects(db: Database.Database) {
+  return db.prepare(`
+    SELECT
+      p.id, p.title, p.status, p.agent_type,
+      p.created_at, p.updated_at,
+      COALESCE(n.node_count, 0) as node_count,
+      COALESCE(e.edge_total, 0) as edge_total,
+      COALESCE(e.edge_unresulted, 0) as edge_unresulted,
+      COALESCE(e.edge_inflight, 0) as edge_inflight
+    FROM projects p
+    LEFT JOIN (
+      SELECT project_id, COUNT(*) as node_count
+      FROM nodes GROUP BY project_id
+    ) n ON n.project_id = p.id
+    LEFT JOIN (
+      SELECT
+        project_id,
+        COUNT(*) as edge_total,
+        SUM(CASE WHEN to_node_ids = '[]' AND claimed_at IS NULL THEN 1 ELSE 0 END) as edge_unresulted,
+        SUM(CASE WHEN to_node_ids = '[]' AND claimed_at IS NOT NULL THEN 1 ELSE 0 END) as edge_inflight
+      FROM edges GROUP BY project_id
+    ) e ON e.project_id = p.id
+    ORDER BY p.created_at DESC
+  `).all() as any[];
+}
+
+export function getProjectDetail(db: Database.Database, projectId: number) {
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as any;
+  if (!project) return null;
+
+  const nodes = db.prepare(
+    'SELECT id, description, created_by, edge_id, created_at FROM nodes WHERE project_id = ? ORDER BY id ASC'
+  ).all(projectId) as any[];
+
+  const edges = db.prepare(
+    'SELECT id, from_node_ids, to_node_ids, direction_description, failure_count, claimed_at, created_at FROM edges WHERE project_id = ? ORDER BY id ASC'
+  ).all(projectId) as any[];
+
+  return {
+    ...project,
+    evidence_node_ids: project.evidence_node_ids ? JSON.parse(project.evidence_node_ids) : null,
+    nodes,
+    edges: edges.map((e: any) => ({
+      ...e,
+      from_node_ids: JSON.parse(e.from_node_ids),
+      to_node_ids: JSON.parse(e.to_node_ids),
+    })),
+  };
+}
+
+export function getEdgeStatuses(db: Database.Database, projectId: number) {
+  const edges = db.prepare(
+    'SELECT id, from_node_ids, to_node_ids, direction_description, failure_count, claimed_at, created_at FROM edges WHERE project_id = ? ORDER BY id ASC'
+  ).all(projectId) as any[];
+
+  return edges.map((e: any) => {
+    const toIds = JSON.parse(e.to_node_ids);
+    let status: string;
+    if (toIds.length > 0) {
+      status = 'completed';
+    } else if (e.claimed_at !== null) {
+      status = 'running';
+    } else {
+      status = 'pending';
+    }
+    return {
+      ...e,
+      from_node_ids: JSON.parse(e.from_node_ids),
+      to_node_ids: toIds,
+      status,
+    };
+  });
+}
