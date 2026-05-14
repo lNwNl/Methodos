@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import type { AgentDriver } from '../driver/types';
-import { getActiveProjects, hasUnresultedEdges } from '../db/operations';
+import { getActiveProjects, hasUnresultedEdges, getProject } from '../db/operations';
 import { shouldTriggerPlan, executePlan } from './plan-exec';
 import { canExecuteAct, executeAct } from './act-exec';
 import { config } from '../config';
@@ -12,14 +12,25 @@ interface LoopState {
   running: boolean;
   planInFlight: Set<number>;
   actsInFlight: Map<number, number>;
+  drivers: Map<number, AgentDriver>;
 }
 
-export function createLoop(db: Database.Database, driver: AgentDriver) {
+export type DriverFactory = (projectId: number, agentType: string) => AgentDriver;
+
+export function createLoop(db: Database.Database, driverFactory: DriverFactory) {
   const state: LoopState = {
     running: false,
     planInFlight: new Set(),
     actsInFlight: new Map(),
+    drivers: new Map(),
   };
+
+  function getDriver(pid: number, agentType: string): AgentDriver {
+    if (!state.drivers.has(pid)) {
+      state.drivers.set(pid, driverFactory(pid, agentType));
+    }
+    return state.drivers.get(pid)!;
+  }
 
   async function tick() {
     const ts = new Date().toISOString();
@@ -34,7 +45,7 @@ export function createLoop(db: Database.Database, driver: AgentDriver) {
         state.planInFlight.add(pid);
         logger.info({ projectId: pid }, 'Triggering Plan');
 
-        executePlan(db, pid, driver, ts).then((result) => {
+        executePlan(db, pid, getDriver(pid, project.agent_type), ts).then((result) => {
           state.planInFlight.delete(pid);
           if (result.success) {
             logger.info({ projectId: pid }, 'Plan completed successfully');
@@ -49,7 +60,7 @@ export function createLoop(db: Database.Database, driver: AgentDriver) {
         const inflight = state.actsInFlight.get(pid) || 0;
         state.actsInFlight.set(pid, inflight + 1);
 
-        executeAct(db, pid, driver, ts).then((result) => {
+        executeAct(db, pid, getDriver(pid, project.agent_type), ts).then((result) => {
           const current = state.actsInFlight.get(pid) || 1;
           if (current <= 1) {
             state.actsInFlight.delete(pid);

@@ -7,4 +7,5 @@ export const config = {
   snapshotMaxNodes: parseInt(process.env.SNAPSHOT_MAX_NODES || '100', 10),
   snapshotMaxEdges: parseInt(process.env.SNAPSHOT_MAX_EDGES || '200', 10),
   claimedExpiryMs: 30 * 60 * 1000, // 30 minutes
+  dockerSocket: process.env.DOCKER_SOCKET || '/run/user/1000/podman/podman.sock',
 } as const;

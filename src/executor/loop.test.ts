@@ -42,7 +42,7 @@ describe('Executor Loop Integration', () => {
     const now = new Date().toISOString();
     const projectId = createProject(db, 'Test project', 'mock', 'mock:v1', now);
 
-    const { start } = createLoop(db, driver);
+    const { start } = createLoop(db, () => driver);
     const stop = start();
 
     for (let i = 0; i < 30; i++) {

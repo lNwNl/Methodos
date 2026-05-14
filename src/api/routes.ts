@@ -17,6 +17,12 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database) {
     const projectId = createProject(db, title, agent_type, image_tag, ts);
 
     const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as any;
+
+    const { ensureContainer } = await import('../docker/manager');
+    ensureContainer(projectId, image_tag).catch((err: any) => {
+      console.error(`Failed to start container for project ${projectId}:`, err.message);
+    });
+
     return reply.status(201).header('HX-Trigger', 'projectCreated').send(project);
   });
 
@@ -107,6 +113,9 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database) {
 
     const ts = new Date().toISOString();
     updateProject(db, id, { status: 'stopped' }, ts);
+
+    const { stopContainer } = await import('../docker/manager');
+    stopContainer(id).catch(() => {});
 
     return { status: 'stopped' };
   });
