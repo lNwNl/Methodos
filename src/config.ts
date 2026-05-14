@@ -8,4 +8,9 @@ export const config = {
   snapshotMaxEdges: parseInt(process.env.SNAPSHOT_MAX_EDGES || '200', 10),
   claimedExpiryMs: 30 * 60 * 1000, // 30 minutes
   dockerSocket: process.env.DOCKER_SOCKET || '/run/user/1000/podman/podman.sock',
+  agentImages: {
+    opencode: 'methodos-opencode:v1.14.50',
+    'claude-code': 'methodos-claude-code:v1.0.0',
+    mock: 'test-agent:v1',
+  } as Record<string, string>,
 } as const;

@@ -2,12 +2,16 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const promptIndex = process.argv.indexOf('-p');
-const promptFile = promptIndex !== -1 ? process.argv[promptIndex + 1] : process.argv[2];
+// Support both -p <file> (legacy) and -f <file> (opencode CLI standard)
+const pIndex = process.argv.indexOf('-p');
+const fIndex = process.argv.indexOf('-f');
+const promptFile = pIndex !== -1 ? process.argv[pIndex + 1]
+  : fIndex !== -1 ? process.argv[fIndex + 1]
+  : process.argv[2];
 const sessionId = `ses_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 if (!promptFile) {
-  process.stderr.write('Usage: opencode run -p <prompt.md>\n');
+  process.stderr.write('Usage: opencode run -f <prompt.md>\n');
   process.exit(1);
 }
 

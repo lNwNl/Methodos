@@ -41,9 +41,11 @@ export class OpenCodeDriver implements AgentDriver {
     await ensureWorkdir(this.projectId, params.workdir);
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
-    const promptArg = `-p`;
+    // opencode run --format json --dir <workdir> -f prompt.md "<instruction>"
     const result = await execInContainer(this.projectId, [
-      this.cliPath, 'run', promptArg, promptPath,
+      this.cliPath, 'run', '--format', 'json', '--dir', params.workdir,
+      '-f', promptPath,
+      '基于 prompt.md 中的当前探索图 snapshot，判断下一步探索方向。以 JSON 格式返回 edges 列表或 complete: true。',
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
@@ -72,7 +74,9 @@ export class OpenCodeDriver implements AgentDriver {
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
     const result = await execInContainer(this.projectId, [
-      this.cliPath, 'run', '-p', promptPath,
+      this.cliPath, 'run', '--format', 'json', '--dir', params.workdir,
+      '-f', promptPath,
+      '执行 prompt.md 中描述的探索方向，产出客观结论。以 JSON 格式返回 { description: "..." }。',
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
@@ -102,7 +106,10 @@ export class OpenCodeDriver implements AgentDriver {
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
     const result = await execInContainer(this.projectId, [
-      this.cliPath, 'run', '-p', promptPath, '-s', params.sessionId,
+      this.cliPath, 'run', '--format', 'json', '--dir', params.workdir,
+      '--session', params.sessionId,
+      '-f', promptPath,
+      '停止探索，总结已有成果。以 JSON 格式返回 { description: "..." }。',
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
