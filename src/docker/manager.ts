@@ -9,6 +9,7 @@ function getOpenCodeBinds(): string[] {
   return [
     `${join(home, '.config/opencode')}:/root/.config/opencode:ro`,
     `${join(home, '.local/share/opencode')}:/root/.local/share/opencode`,
+    `${join(home, '.agents')}:/root/.agents:ro`,
   ];
 }
 
