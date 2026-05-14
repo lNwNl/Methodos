@@ -90,6 +90,7 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database) {
 
     updateProject(db, id, {
       status: 'active',
+      lastPlanAt: null,
       failureCount: 0,
       summary: null,
       evidenceNodeIds: null,

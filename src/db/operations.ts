@@ -223,7 +223,7 @@ export function updateProject(
   projectId: number,
   updates: {
     status?: string;
-    lastPlanAt?: string;
+    lastPlanAt?: string | null;
     failureCount?: number;
     summary?: string | null;
     evidenceNodeIds?: number[] | null;
