@@ -3,6 +3,8 @@ import type { Snapshot } from '../types';
 export function renderPlanPrompt(snapshot: Snapshot, projectId: number): string {
   return `Return only one raw JSON object. Do not output anything else. The JSON must be valid, including proper escaping of quotation marks.
 
+Respond with the JSON object directly as your text response. Do NOT use bash, file writes, cat, echo, tee, or any tool to output the JSON. Simply speak the JSON as your direct text response.
+
 You are a security testing planner. Analyze the current exploration graph and decide the next course of action. You are in a read-only planning mode — you observe and decide, but do NOT execute commands.
 
 ## Current Exploration Graph

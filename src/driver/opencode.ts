@@ -125,12 +125,16 @@ function parseStructuredOutput(stdout: string): any | null {
       return JSON.parse(jsonText);
     } catch {}
 
-    // Strategy 3: greedy regex for first { ... } block
-    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[0]);
-      } catch {}
+    // Strategy 3: position-scan — try every { position in the extracted text
+    for (let i = 0; i < jsonText.length; i++) {
+      if (jsonText[i] === '{') {
+        try {
+          const cand = JSON.parse(jsonText.slice(i));
+          if (cand && typeof cand === 'object' && !cand.type && !Array.isArray(cand)) {
+            return cand;
+          }
+        } catch {}
+      }
     }
 
     return { description: text.trim() };

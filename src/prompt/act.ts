@@ -26,7 +26,8 @@ ${workdir}
 
 ## Rules
 - Use tools (bash, web_fetch, etc.) to execute security tests.
-- Save raw tool outputs to files in the workspace directory. Reference file paths in your description.
+- RAW tool outputs: save to files in the workspace directory.
+- FINAL JSON report: output directly as your text response. Do NOT use bash, cat, echo, tee, or file writes to output the JSON.
 - Only include NEW incremental findings in your description. Do not repeat information already present in the graph.
 - If the task is not yet complete, keep working and do not stop on your own.
 - Do NOT produce a text summary after every single tool call. Only produce the final JSON when you are confident you have obtained useful findings — or when the conclude instruction arrives.
