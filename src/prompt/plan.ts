@@ -1,43 +1,30 @@
 import type { Snapshot } from '../types';
 
 export function renderPlanPrompt(snapshot: Snapshot, projectId: number): string {
-  return `# 任务：规划下一步探索方向
+  return `你是一个安全测试自动化系统。分析当前探索图并输出纯 JSON。
 
 ## 当前探索图
 \`\`\`json
 ${JSON.stringify(snapshot, null, 2)}
 \`\`\`
 
-## 你的任务
-基于以上信息，判断下一步应该探索什么方向。
-
-1. 如果认为任务已完成，返回 \`complete: true\`，附带 \`summary\` 和 \`evidence_node_ids\`
-2. 如果认为还有探索方向，返回新的 Edge 列表
-3. 如果无法继续且未完成，返回空 edges 数组（\`complete: false\`）
-
-## 输出格式
-请以 JSON 格式输出，严格遵循以下 Schema：
-
+## 输出格式（只输出以下 JSON，不要任何其他文字）
 \`\`\`json
-{
-  "edges": [
-    {
-      "from_node_ids": [1, 3],
-      "direction_description": "尝试 SQL 注入登录表单"
-    }
-  ],
-  "complete": false
-}
+${JSON.stringify({
+    edges: [{ from_node_ids: [1], direction_description: "尝试 SQL 注入登录表单" }],
+    complete: false,
+  }, null, 2)}
 \`\`\`
 
+三种情况：
+1. 继续探索 → \`"complete": false\` + \`edges\` 数组
+2. 任务完成 → \`"complete": true\` + \`"summary"\` + \`"evidence_node_ids"\`（edges 必须为 []）
+3. 无法继续 → \`"complete": false\` + \`edges: []\`
+
 ## 约束
-- 每条 Edge 的 \`from_node_ids\` 必须引用已有 Node 的 ID
-- Node description 只放结论摘要和文件路径（不超过 500 字符）
-- 大量原始数据写入文件，description 中用路径引用
-- 仅当判定任务完成时才返回 \`complete: true\` 和 \`summary\`、\`evidence_node_ids\`
-- \`complete: true\` 时 \`edges\` 必须为空数组
-- \`complete: false\` 时不要返回 \`summary\` 和 \`evidence_node_ids\` 字段
-- 当前工作目录根路径：/home/kali/workspace/
+- 只输出 JSON 对象，不要任何前缀或后缀文字
+- \`from_node_ids\` 必须引用已有 Node ID
+- 工作目录：/home/kali/workspace/
 
 project_id: ${projectId}`;
 }

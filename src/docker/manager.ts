@@ -1,5 +1,16 @@
 import { docker, getContainerName } from './index';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type { Container } from 'dockerode';
+
+const home = homedir();
+
+function getOpenCodeBinds(): string[] {
+  return [
+    `${join(home, '.config/opencode')}:/root/.config/opencode:ro`,
+    `${join(home, '.local/share/opencode')}:/root/.local/share/opencode`,
+  ];
+}
 
 export async function ensureContainer(
   projectId: number,
@@ -26,6 +37,7 @@ export async function ensureContainer(
         WorkingDir: '/home/kali/workspace',
         HostConfig: {
           AutoRemove: false,
+          Binds: getOpenCodeBinds(),
         },
       });
       await container.start();

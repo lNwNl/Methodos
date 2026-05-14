@@ -14,16 +14,38 @@ function findSessionId(stdout: string): string | null {
   return null;
 }
 
-function parseJsonOutput(stdout: string): any | null {
+function extractTextContent(stdout: string): string {
   const lines = stdout.trim().split('\n');
-  for (let i = lines.length - 1; i >= 0; i--) {
+  let text = '';
+  for (const line of lines) {
     try {
-      const obj = JSON.parse(lines[i]);
-      if (obj.type === 'step_start' || obj.type === 'step_finish') continue;
-      return obj;
+      const obj = JSON.parse(line);
+      if (obj.type === 'text' && obj.part?.text) {
+        text += obj.part.text;
+      }
     } catch {}
   }
-  return null;
+  return text;
+}
+
+function parseStructuredOutput(stdout: string): any | null {
+  const text = extractTextContent(stdout);
+  if (!text) return null;
+
+  // Try extracting JSON from code fence first
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const jsonText = fenceMatch ? fenceMatch[1].trim() : text;
+
+  // Try to extract a JSON object
+  const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch {}
+  }
+
+  // Fallback: return the text as a description
+  return { description: text.trim() };
 }
 
 export class OpenCodeDriver implements AgentDriver {
@@ -41,19 +63,18 @@ export class OpenCodeDriver implements AgentDriver {
     await ensureWorkdir(this.projectId, params.workdir);
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
-    // opencode run --format json --dir <workdir> -f prompt.md "<instruction>"
     const result = await execInContainer(this.projectId, [
-      this.cliPath, 'run', '--format', 'json', '--dir', params.workdir,
+      this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
+      '根据 prompt.md 中的探索图 snapshot 和指令，返回 JSON。',
       '-f', promptPath,
-      '基于 prompt.md 中的当前探索图 snapshot，判断下一步探索方向。以 JSON 格式返回 edges 列表或 complete: true。',
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
     });
 
-    const output = parseJsonOutput(result.stdout);
+    const output = parseStructuredOutput(result.stdout);
     if (!output) {
-      throw new Error(`Failed to parse Plan JSON from output: ${result.stdout.slice(0, 200)}`);
+      throw new Error(`Failed to parse Plan output from: ${result.stdout.slice(0, 300)}`);
     }
 
     return {
@@ -74,23 +95,23 @@ export class OpenCodeDriver implements AgentDriver {
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
     const result = await execInContainer(this.projectId, [
-      this.cliPath, 'run', '--format', 'json', '--dir', params.workdir,
+      this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
+      '根据 prompt.md 中的指令执行探索。',
       '-f', promptPath,
-      '执行 prompt.md 中描述的探索方向，产出客观结论。以 JSON 格式返回 { description: "..." }。',
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
     });
 
     const sessionId = findSessionId(result.stdout) || `fallback-${Date.now()}`;
-    const output = parseJsonOutput(result.stdout);
+    const output = parseStructuredOutput(result.stdout);
 
-    if (!output || !output.description) {
-      throw new Error(`Failed to parse Act JSON: ${result.stdout.slice(0, 200)}`);
+    if (!output) {
+      throw new Error(`Failed to parse Act output from: ${result.stdout.slice(0, 300)}`);
     }
 
     return {
-      output: { description: output.description },
+      output: { description: output.description || extractTextContent(result.stdout) },
       sessionId,
     };
   }
@@ -106,20 +127,20 @@ export class OpenCodeDriver implements AgentDriver {
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
     const result = await execInContainer(this.projectId, [
-      this.cliPath, 'run', '--format', 'json', '--dir', params.workdir,
+      this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
       '--session', params.sessionId,
+      '停止探索，总结已有成果。',
       '-f', promptPath,
-      '停止探索，总结已有成果。以 JSON 格式返回 { description: "..." }。',
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
     });
 
-    const output = parseJsonOutput(result.stdout);
-    if (!output || !output.description) {
-      throw new Error(`Failed to parse Conclude JSON: ${result.stdout.slice(0, 200)}`);
+    const output = parseStructuredOutput(result.stdout);
+    if (!output) {
+      throw new Error(`Failed to parse Conclude output from: ${result.stdout.slice(0, 300)}`);
     }
 
-    return { description: output.description };
+    return { description: output.description || extractTextContent(result.stdout) };
   }
 }
