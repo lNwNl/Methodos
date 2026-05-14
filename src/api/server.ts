@@ -7,6 +7,10 @@ import { registerRoutes } from './routes';
 export function createServer(db: Database.Database, useDocker = false) {
   const app = Fastify({ logger: false });
 
+  // Accept form-encoded and empty POST bodies (HTMX buttons)
+  app.addContentTypeParser('text/plain', (_req, _payload, done) => done(null));
+  app.addContentTypeParser('application/x-www-form-urlencoded', (_req, _payload, done) => done(null));
+
   app.register(fastifyStatic, {
     root: join(process.cwd(), 'static'),
     prefix: '/',
