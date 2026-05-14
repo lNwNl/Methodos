@@ -97,6 +97,7 @@ export class OpenCodeDriver implements AgentDriver {
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
+      env: { OPENCODE_EXPERIMENTAL_PLAN_MODE: 'true' },
     });
 
     const output = parseStructuredOutput(result.stdout);
@@ -128,6 +129,7 @@ export class OpenCodeDriver implements AgentDriver {
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
+      env: { OPENCODE_DANGEROUSLY_SKIP_PERMISSIONS: 'true' },
     });
 
     const sessionId = findSessionId(result.stdout) || `fallback-${Date.now()}`;
@@ -138,7 +140,7 @@ export class OpenCodeDriver implements AgentDriver {
     }
 
     return {
-      output: { description: output.description || extractTextContent(result.stdout) },
+      output: { description: output.description || extractAnyText(result.stdout) },
       sessionId,
     };
   }
@@ -161,6 +163,7 @@ export class OpenCodeDriver implements AgentDriver {
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
+      env: { OPENCODE_DANGEROUSLY_SKIP_PERMISSIONS: 'true' },
     });
 
     const output = parseStructuredOutput(result.stdout);
@@ -168,6 +171,6 @@ export class OpenCodeDriver implements AgentDriver {
       throw new Error(`Failed to parse Conclude output from: ${result.stdout.slice(0, 300)}`);
     }
 
-    return { description: output.description || extractTextContent(result.stdout) };
+    return { description: output.description || extractAnyText(result.stdout) };
   }
 }

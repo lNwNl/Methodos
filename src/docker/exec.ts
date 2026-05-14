@@ -16,12 +16,18 @@ export async function execInContainer(
   options: {
     workdir?: string;
     timeout?: number;
+    env?: Record<string, string>;
   } = {},
 ): Promise<ExecResult> {
   const containerName = getContainerName(projectId);
   const args = ['exec'];
   if (options.workdir) {
     args.push('-w', options.workdir);
+  }
+  if (options.env) {
+    for (const [k, v] of Object.entries(options.env)) {
+      args.push('--env', `${k}=${v}`);
+    }
   }
   args.push(containerName, ...cmd);
 
