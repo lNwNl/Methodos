@@ -81,11 +81,11 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
           <div class="flex gap-2 ml-4 shrink-0">
             ${p.status === 'active' ? `
             <button class="px-3 py-1.5 text-xs rounded-lg bg-amber-900/50 text-amber-400 hover:bg-amber-900 border border-amber-800 transition-colors"
-              hx-post="/projects/${p.id}/stop" hx-swap="none">暂停</button>
+              hx-post="/projects/${p.id}/stop" hx-ext="json-enc" hx-swap="none">暂停</button>
             ` : ''}
             ${p.status !== 'active' ? `
             <button class="px-3 py-1.5 text-xs rounded-lg bg-blue-900/50 text-blue-400 hover:bg-blue-900 border border-blue-800 transition-colors"
-              hx-post="/projects/${p.id}/push" hx-swap="none">推进</button>
+              hx-post="/projects/${p.id}/push" hx-ext="json-enc" hx-swap="none">推进</button>
             ` : ''}
           </div>
         </div>

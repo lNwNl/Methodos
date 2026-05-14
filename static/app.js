@@ -45,6 +45,7 @@ function setupButtons(data) {
   if (data.status === 'active') {
     stopBtn.classList.remove('hidden');
     stopBtn.setAttribute('hx-post', `/projects/${projectId}/stop`);
+    stopBtn.setAttribute('hx-ext', 'json-enc');
     htmx.process(stopBtn);
     pushBtn.classList.add('hidden');
   } else if (data.status === 'stopped' || data.status === 'failed') {
