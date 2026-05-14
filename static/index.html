@@ -55,7 +55,7 @@
       </div>
     </div>
 
-    <div hx-get="/projects-list" hx-trigger="load, every 5s, projectCreated from:body, projectPushed from:body" hx-swap="innerHTML" id="project-list">
+    <div hx-get="/projects-list" hx-trigger="load, every 5s, projectCreated, projectPushed" hx-swap="innerHTML" id="project-list">
       <div class="text-center text-gray-500 py-12">加载中...</div>
     </div>
   </div>
