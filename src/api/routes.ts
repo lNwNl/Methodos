@@ -138,7 +138,7 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database) {
           insertNode(db, id, node.description, 'human', null, ts);
         }
       }
-      return { status: 'active', message: 'Nodes added, current batch continues' };
+      return reply.header('HX-Trigger', 'projectPushed').send({ status: 'active', message: 'Nodes added, current batch continues' });
     }
 
     // Non-active → resume
@@ -159,7 +159,7 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database) {
       evidenceNodeIds: null,
     }, ts);
 
-    return { status: 'active', message: 'Project resumed' };
+    return reply.header('HX-Trigger', 'projectPushed').send({ status: 'active', message: 'Project resumed' });
   });
 
   // GET /projects/:id/edges
