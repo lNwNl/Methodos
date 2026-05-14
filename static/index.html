@@ -6,6 +6,7 @@
   <title>Methodos</title>
   <link rel="stylesheet" href="/output.css">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-json-enc@2.0.0/json-enc.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
@@ -21,7 +22,7 @@
     <div id="create-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md mx-4">
         <h2 class="text-lg font-semibold mb-4">新建项目</h2>
-        <form hx-post="/projects" hx-target="#project-list" hx-swap="innerHTML"
+        <form hx-post="/projects" hx-ext="json-enc" hx-target="#project-list" hx-swap="innerHTML"
           hx-on::after-request="if(event.detail.successful) { document.getElementById('create-modal').classList.add('hidden'); this.reset(); }">
           <div class="space-y-4">
             <div>
