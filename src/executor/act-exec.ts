@@ -1,0 +1,56 @@
+import Database from 'better-sqlite3';
+import { renderSnapshot } from '../snapshot/render';
+import { renderActPrompt } from '../prompt/act';
+import { config } from '../config';
+import { claimEdge, writeActResult, handleActFailure, countActiveActs } from '../db/operations';
+import type { AgentDriver } from '../driver/types';
+import { z } from 'zod';
+
+const agentOutputSchema = z.object({
+  description: z.string(),
+});
+
+export function canExecuteAct(db: Database.Database, projectId: number): boolean {
+  const active = countActiveActs(db, projectId);
+  return active < config.maxActConcurrency;
+}
+
+export function executeAct(
+  db: Database.Database,
+  projectId: number,
+  driver: AgentDriver,
+  ts: string,
+): Promise<{ success: boolean; edgeId?: number; error?: string }> {
+  const edge = claimEdge(db, projectId, config.maxFailures, config.claimedExpiryMs, ts);
+  if (!edge) return Promise.resolve({ success: false, error: 'No unclaimed edge' });
+
+  const snapshot = renderSnapshot(db, projectId, {
+    snapshotMaxNodes: config.snapshotMaxNodes,
+    snapshotMaxEdges: config.snapshotMaxEdges,
+  });
+
+  const workdir = `/home/kali/workspace/task_${edge.id}/`;
+  const prompt = renderActPrompt(snapshot, edge.direction_description, workdir, projectId, edge.id);
+
+  return driver.executeAct({
+    prompt,
+    workdir,
+    timeout: config.actTimeoutMs,
+  }).then((result) => {
+    const parsed = agentOutputSchema.safeParse(result.output);
+    if (!parsed.success) {
+      handleActFailure(db, projectId, edge.id, config.maxFailures, ts);
+      return { success: false, edgeId: edge.id, error: `Invalid output: ${parsed.error.message}` };
+    }
+
+    try {
+      writeActResult(db, projectId, edge.id, parsed.data.description, 'agent', ts);
+      return { success: true, edgeId: edge.id };
+    } catch (err: any) {
+      return { success: false, edgeId: edge.id, error: err.message };
+    }
+  }).catch((err) => {
+    handleActFailure(db, projectId, edge.id, config.maxFailures, ts);
+    return { success: false, edgeId: edge.id, error: err.message };
+  });
+}
