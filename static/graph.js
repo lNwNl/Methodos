@@ -1,15 +1,9 @@
 const params = new URLSearchParams(window.location.search);
 const projectId = params.get('id');
 
-const NODE_COLORS = { human: '#3b82f6', agent: '#10b981', system: '#ef4444' };
-const STATUS_MAP = {
-  active:    { cls: 'bg-emerald-900/50 text-emerald-400 border-emerald-800', label: '活跃' },
-  completed: { cls: 'bg-blue-900/50 text-blue-400 border-blue-800',    label: '完成' },
-  failed:    { cls: 'bg-red-900/50 text-red-400 border-red-800',        label: '失败' },
-  stopped:   { cls: 'bg-gray-800 text-gray-400 border-gray-700',        label: '已暂停' },
-};
+const NODE_COLORS = { human: '#3C5DFF', agent: '#22C55E', system: '#EF4444' };
 
-const { createApp, ref, onMounted, onBeforeUnmount, nextTick } = Vue;
+const { createApp, ref, reactive, onMounted, onBeforeUnmount, nextTick } = Vue;
 
 createApp({
   setup() {
@@ -22,67 +16,58 @@ createApp({
     let cy = null;
     let timer = null;
 
+    function statusInfo(p) {
+      if (p.status === 'active' && !p.last_plan_at && p.edges.length === 0) {
+        return { cls: 'badge-planning', label: '推理中' };
+      }
+      const m = {
+        active:    { cls: 'badge-active',    label: '活跃' },
+        completed: { cls: 'badge-completed', label: '完成' },
+        failed:    { cls: 'badge-failed',    label: '失败' },
+        stopped:   { cls: 'badge-stopped',   label: '暂停' },
+      };
+      return m[p.status] || m.active;
+    }
+
     async function fetchProject() {
       try {
         const r = await fetch(`/projects/${projectId}`);
-        if (!r.ok) throw new Error(r.status);
+        if (!r.ok) throw new Error(String(r.status));
         project.value = await r.json();
         error.value = '';
         await nextTick();
         renderGraph();
       } catch (e) {
-        error.value = `无法加载项目: ${e.message}`;
+        error.value = `无法加载: ${e.message}`;
       } finally {
         loading.value = false;
       }
     }
 
     function renderGraph() {
-      const data = project.value;
-      if (!data) return;
+      const p = project.value;
+      if (!p) return;
       const container = document.getElementById('graph');
       if (!container) return;
 
       const elements = [];
-
-      for (const node of data.nodes) {
+      for (const n of p.nodes) {
         elements.push({
-          data: {
-            id: `n${node.id}`,
-            label: truncate(node.description, 60),
-            createdBy: node.created_by,
-            nodeId: node.id,
-          },
+          data: { id: `n${n.id}`, label: trunc(n.description, 55), createdBy: n.created_by, nodeId: n.id },
         });
       }
-
-      for (const edge of data.edges) {
-        const isResulted = edge.to_node_ids.length > 0;
-        for (const fromId of edge.from_node_ids) {
-          for (const toId of edge.to_node_ids) {
+      for (const e of p.edges) {
+        const ok = e.to_node_ids.length > 0;
+        for (const f of e.from_node_ids) {
+          for (const t of e.to_node_ids) {
             elements.push({
-              data: {
-                id: `e${edge.id}_${fromId}_${toId}`,
-                source: `n${fromId}`,
-                target: `n${toId}`,
-                label: truncate(edge.direction_description, 40),
-                edgeId: edge.id,
-                failureCount: edge.failure_count,
-              },
-              classes: isResulted ? 'resulted' : 'pending',
+              data: { id: `e${e.id}_${f}_${t}`, source: `n${f}`, target: `n${t}`, label: trunc(e.direction_description, 40), edgeId: e.id, failureCount: e.failure_count },
+              classes: ok ? 'resulted' : 'pending',
             });
           }
-          if (!isResulted) {
+          if (!ok) {
             elements.push({
-              data: {
-                id: `e${edge.id}_pending`,
-                source: `n${fromId}`,
-                target: `n${fromId}`,
-                label: truncate(edge.direction_description, 40),
-                edgeId: edge.id,
-                failureCount: edge.failure_count,
-                pending: true,
-              },
+              data: { id: `e${e.id}_pending`, source: `n${f}`, target: `n${f}`, label: trunc(e.direction_description, 40), edgeId: e.id, failureCount: e.failure_count, pending: true },
               classes: 'pending',
             });
           }
@@ -95,163 +80,121 @@ createApp({
         container,
         elements,
         style: [
-          {
-            selector: 'node',
-            style: {
-              'label': 'data(label)',
-              'background-color': '#6b7280',
-              'border-width': 2,
-              'border-color': '#1f2937',
-              'font-size': '11px',
-              'text-wrap': 'wrap',
-              'text-max-width': '180px',
-              'text-valign': 'center',
-              'text-halign': 'center',
-              'color': '#d1d5db',
-              'padding': '10px',
-              'shape': 'round-rectangle',
-            },
-          },
-          { selector: 'node[createdBy="human"]',  style: { 'background-color': NODE_COLORS.human } },
-          { selector: 'node[createdBy="agent"]',  style: { 'background-color': NODE_COLORS.agent } },
-          { selector: 'node[createdBy="system"]', style: { 'background-color': NODE_COLORS.system } },
-          {
-            selector: '.resulted',
-            style: { 'width': 2, 'line-color': '#4b5563', 'target-arrow-color': '#4b5563', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#6b7280', 'text-rotation': 'autorotate' },
-          },
-          {
-            selector: '.pending',
-            style: { 'width': 1.5, 'line-color': '#6b7280', 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#6b7280' },
-          },
-          { selector: '.evidence', style: { 'border-color': '#fbbf24', 'border-width': 3 } },
+          { selector: 'node', style: { 'label': 'data(label)', 'background-color': '#3A3E52', 'border-width': 1.5, 'border-color': '#2A2D3E', 'font-size': '10px', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'color': '#CBD5E1', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif' } },
+          { selector: 'node[createdBy="human"]',  style: { 'background-color': NODE_COLORS.human, 'border-color': '#3C5DFF' } },
+          { selector: 'node[createdBy="agent"]',  style: { 'background-color': NODE_COLORS.agent, 'border-color': '#22C55E' } },
+          { selector: 'node[createdBy="system"]', style: { 'background-color': NODE_COLORS.system, 'border-color': '#EF4444' } },
+          { selector: '.resulted', style: { 'width': 1.5, 'line-color': '#4A4E62', 'target-arrow-color': '#4A4E62', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif' } },
+          { selector: '.pending', style: { 'width': 1.2, 'line-color': '#3A3E52', 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'font-family': 'Inter, sans-serif' } },
+          { selector: '.evidence', style: { 'border-color': '#F59E0B', 'border-width': 2.5 } },
         ],
-        layout: { name: 'dagre', rankDir: 'TB', spacingFactor: 1.5, nodeDimensionsIncludeLabels: true },
+        layout: { name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true },
       });
 
-      const evidenceIds = data.evidence_node_ids || [];
-      for (const id of evidenceIds) {
-        const node = cy.getElementById(`n${id}`);
-        if (node.length) node.addClass('evidence');
+      for (const id of (p.evidence_node_ids || [])) {
+        const n = cy.getElementById(`n${id}`);
+        if (n.length) n.addClass('evidence');
       }
 
-      cy.on('tap', 'node', (evt) => {
-        const d = evt.target.data();
-        selected.value = { type: 'node', data: d };
+      cy.on('tap', 'node', e => {
+        const d = e.target.data();
+        selected.value = { type: 'node', nodeId: d.nodeId, createdBy: d.createdBy, description: d.label, data: d };
       });
-      cy.on('tap', 'edge', (evt) => {
-        const d = evt.target.data();
-        selected.value = { type: 'edge', data: d };
+      cy.on('tap', 'edge', e => {
+        const d = e.target.data();
+        selected.value = { type: 'edge', edgeId: d.edgeId, pending: d.pending, failureCount: d.failureCount, description: d.label, data: d };
       });
     }
 
-    function truncate(text, max) {
-      if (!text) return '';
-      return text.length > max ? text.slice(0, max) + '...' : text;
+    function trunc(s, max) {
+      if (!s) return '';
+      return s.length > max ? s.slice(0, max) + '...' : s;
     }
+
+    function zoomIn()  { if (cy) cy.zoom(cy.zoom() * 1.2); }
+    function zoomOut() { if (cy) cy.zoom(cy.zoom() / 1.2); }
+    function zoomFit() { if (cy) cy.fit(undefined, 50); }
 
     async function stopProject() {
-      try {
-        await fetch(`/projects/${projectId}/stop`, { method: 'POST' });
-        fetchProject();
-      } catch {}
+      try { await fetch(`/projects/${projectId}/stop`, { method: 'POST' }); fetchProject(); } catch {}
     }
 
     async function confirmPush() {
       const nodes = pushNodes.value.filter(n => n.description.trim()).map(n => ({ description: n.description.trim() }));
       try {
-        await fetch(`/projects/${projectId}/push`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodes }),
-        });
+        await fetch(`/projects/${projectId}/push`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nodes }) });
         showPushModal.value = false;
         pushNodes.value = [{ description: '' }];
         fetchProject();
       } catch {}
     }
 
-    function addPushNode() {
-      pushNodes.value.push({ description: '' });
-    }
+    function addNode() { pushNodes.value.push({ description: '' }); }
 
-    onMounted(() => {
-      fetchProject();
-      timer = setInterval(fetchProject, 2000);
-    });
-
-    onBeforeUnmount(() => {
-      clearInterval(timer);
-      if (cy) cy.destroy();
-    });
+    onMounted(() => { fetchProject(); timer = setInterval(fetchProject, 2000); });
+    onBeforeUnmount(() => { clearInterval(timer); if (cy) cy.destroy(); });
 
     return {
       project, loading, error, selected, showPushModal, pushNodes,
-      stopProject, confirmPush, addPushNode, truncate, STATUS_MAP,
+      stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc,
     };
   },
 
   template: `
-  <div class="max-w-7xl mx-auto px-4 py-4">
-    <!-- Header bar -->
-    <div class="flex items-center justify-between mb-4">
-      <a href="/" class="text-gray-400 hover:text-white text-sm">&larr; 返回</a>
-      <div class="flex items-center gap-3">
-        <span v-if="project" :class="'px-2.5 py-1 rounded-full text-xs font-medium border ' + ((STATUS_MAP[project.status]||STATUS_MAP.active).cls)"
-          :class="{'animate-pulse': project.status === 'active' && project.edges.length === 0 && !project.last_plan_at}">
-          {{ project.status === 'active' && project.edges.length === 0 && !project.last_plan_at ? '▊ Plan 推理中…' : (STATUS_MAP[project.status]||STATUS_MAP.active).label }}
-        </span>
-        <button v-if="project && project.status === 'active'" @click="stopProject"
-          class="px-3 py-1.5 text-xs rounded-lg bg-amber-900/50 text-amber-400 hover:bg-amber-900 border border-amber-800 transition-colors">
-          暂停
-        </button>
-        <button v-if="project && project.status !== 'active'" @click="showPushModal = true"
-          class="px-3 py-1.5 text-xs rounded-lg bg-blue-900/50 text-blue-400 hover:bg-blue-900 border border-blue-800 transition-colors">
-          推进
-        </button>
+  <div style="display:flex;flex-direction:column;height:100vh;padding:0.75rem 1rem;gap:0.5rem">
+    <!-- Top bar -->
+    <div class="flex items-center justify-between shrink-0">
+      <a href="/" class="back-link">&larr; 返回</a>
+      <div v-if="project" class="flex items-center gap-2">
+        <span :class="'badge ' + statusInfo(project).cls">{{ statusInfo(project).label }}</span>
+        <button v-if="project.status === 'active'" class="btn btn-warning btn-sm" @click="stopProject">暂停</button>
+        <button v-if="project.status !== 'active'" class="btn btn-primary btn-sm" @click="showPushModal = true">推进</button>
       </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center h-64 text-gray-500">
-      <div class="inline-block w-5 h-5 border-2 border-gray-600 border-t-emerald-400 rounded-full animate-spin mr-2"></div>
-      加载中...
-    </div>
+    <div v-if="loading" class="empty-state flex-1"><span class="spinner"></span> 加载中...</div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex items-center justify-center h-64 text-red-400">{{ error }}</div>
+    <div v-else-if="error" class="empty-state flex-1" style="color:var(--danger)">{{ error }}</div>
 
+    <!-- Content -->
     <template v-else-if="project">
-      <!-- Summary bar -->
-      <div v-if="project.status === 'completed' && project.summary" class="bg-gray-900 border border-emerald-800 rounded-xl p-4 mb-4">
-        <div class="flex items-start gap-3">
-          <span class="text-emerald-400 font-bold text-sm shrink-0">完成</span>
-          <p class="text-sm text-gray-300">{{ project.summary }}</p>
-        </div>
+      <div v-if="project.status === 'completed' && project.summary" class="summary-bar">
+        <span class="badge badge-completed" style="margin-right:0.5rem">完成</span>
+        {{ project.summary }}
       </div>
 
-      <div class="flex gap-4" style="height: 70vh">
-        <div class="flex-1 min-w-0 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <div id="graph" style="width:100%;height:100%"></div>
+      <div class="flex gap-2 flex-1 min-h-0" style="flex:1;min-height:0">
+        <!-- Graph -->
+        <div class="graph-container flex-1" style="flex:1;min-width:0">
+          <div class="graph-toolbar">
+            <button class="btn" @click="zoomOut" title="缩小">−</button>
+            <button class="btn" @click="zoomIn"  title="放大">+</button>
+            <button class="btn" @click="zoomFit" title="适配屏幕">⊡</button>
+          </div>
+          <div id="graph" class="w-full h-full"></div>
         </div>
 
-        <!-- Detail panel -->
-        <div v-if="selected" class="w-80 shrink-0 bg-gray-900 border border-gray-700 rounded-xl p-4 overflow-y-auto">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-semibold text-sm">{{ selected.type === 'node' ? 'Node #' + selected.data.nodeId : 'Edge #' + selected.data.edgeId }}</h3>
-            <button @click="selected = null" class="text-gray-500 hover:text-white text-lg leading-none">&times;</button>
-          </div>
-          <div class="text-sm text-gray-400 space-y-1">
-            <template v-if="selected.type === 'node'">
-              <p><span class="text-gray-500">来源:</span> {{ selected.data.createdBy }}</p>
-              <p class="whitespace-pre-wrap">{{ selected.data.label }}</p>
-            </template>
-            <template v-else>
-              <p><span class="text-gray-500">状态:</span>
-                <span :class="selected.data.pending ? 'text-amber-400' : 'text-gray-400'">{{ selected.data.pending ? '待执行' : '已完成' }}</span>
-              </p>
-              <p v-if="selected.data.failureCount > 0" class="text-red-400">失败次数: {{ selected.data.failureCount }}</p>
-              <p class="whitespace-pre-wrap">{{ selected.data.label }}</p>
-            </template>
+        <!-- Side panel -->
+        <div class="detail-panel">
+          <template v-if="selected">
+            <div class="detail-title">{{ selected.type === 'node' ? 'Node #' + selected.nodeId : 'Edge #' + selected.edgeId }}</div>
+            <div class="detail-field">
+              <div class="detail-label">来源</div>
+              <div class="detail-value">{{ selected.type === 'node' ? selected.createdBy : (selected.pending ? '待执行' : '已完成') }}</div>
+            </div>
+            <div v-if="selected.type === 'edge' && selected.failureCount > 0" class="detail-field">
+              <div class="detail-label">失败次数</div>
+              <div class="detail-value" style="color:var(--danger)">{{ selected.failureCount }}</div>
+            </div>
+            <div class="detail-field">
+              <div class="detail-label">{{ selected.type === 'node' ? '描述' : '探索方向' }}</div>
+              <div class="detail-value">{{ selected.description }}</div>
+            </div>
+          </template>
+          <div v-else class="detail-panel-empty">
+            点击节点或边<br>查看详细信息
           </div>
         </div>
       </div>
@@ -259,24 +202,17 @@ createApp({
 
     <!-- Push modal -->
     <Transition name="fade">
-    <div v-if="showPushModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showPushModal = false">
-      <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md mx-4">
-        <h2 class="text-lg font-semibold mb-4">推进项目</h2>
+    <div v-if="showPushModal" class="modal-backdrop" @click.self="showPushModal = false">
+      <div class="modal-panel">
+        <h2 class="modal-title">推进项目</h2>
         <form @submit.prevent="confirmPush">
-          <div class="space-y-3">
-            <div v-for="(n, i) in pushNodes" :key="i">
-              <textarea v-model="n.description" rows="2"
-                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 resize-none mb-2"
-                placeholder="输入新的信息..."></textarea>
-            </div>
-            <button type="button" @click="addPushNode"
-              class="text-xs text-emerald-400 hover:text-emerald-300">+ 添加信息</button>
+          <div v-for="(n,i) in pushNodes" :key="i" class="form-group">
+            <textarea v-model="n.description" class="textarea" rows="2" placeholder="输入新的信息..."></textarea>
           </div>
-          <div class="flex justify-end gap-3 mt-6">
-            <button type="button" @click="showPushModal = false"
-              class="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">取消</button>
-            <button type="submit"
-              class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">提交</button>
+          <button type="button" class="btn btn-sm" @click="addNode" style="color:var(--primary);border-color:var(--primary)">+ 添加信息</button>
+          <div class="form-actions">
+            <button type="button" class="btn" @click="showPushModal = false">取消</button>
+            <button type="submit" class="btn btn-primary">提交</button>
           </div>
         </form>
       </div>
