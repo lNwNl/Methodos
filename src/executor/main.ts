@@ -34,7 +34,7 @@ const driverFactory = (projectId: number, agentType: string) => {
 
 async function main() {
   const PORT = parseInt(process.env.PORT || '3000', 10);
-  await startServer(db, PORT);
+  await startServer(db, PORT, USE_DOCKER);
 
   console.log('Starting executor loop...');
   const { start } = createLoop(db, driverFactory);

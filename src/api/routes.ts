@@ -2,7 +2,12 @@ import type { FastifyInstance } from 'fastify';
 import Database from 'better-sqlite3';
 import { createProjectSchema, pushProjectSchema } from './schemas';
 
-export function registerRoutes(app: FastifyInstance, db: Database.Database) {
+export function registerRoutes(app: FastifyInstance, db: Database.Database, useDocker = false) {
+  // GET /mode
+  app.get('/mode', async (_request, _reply) => {
+    return { docker: useDocker };
+  });
+
   // POST /projects/
   app.post('/projects', async (request, reply) => {
     const parsed = createProjectSchema.safeParse(request.body);
@@ -11,6 +16,11 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database) {
     }
 
     const { title, agent_type } = parsed.data;
+
+    if (agent_type === 'opencode' && !useDocker) {
+      return reply.status(400).send({ error: 'OpenCode requires Docker mode. Start with --docker flag.' });
+    }
+
     const { config } = await import('../config');
     const image_tag = config.agentImages[agent_type] || `${agent_type}:latest`;
     const ts = new Date().toISOString();

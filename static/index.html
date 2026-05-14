@@ -33,10 +33,8 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1">Agent 类型</label>
-              <select name="agent_type" required
+              <select name="agent_type" id="agent-type-select" required
                 class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
-                <option value="mock">mock（测试）</option>
-                <option value="opencode">OpenCode（真实）</option>
               </select>
             </div>
           </div>
@@ -54,5 +52,16 @@
       <div class="text-center text-gray-500 py-12">加载中...</div>
     </div>
   </div>
+
+  <script>
+    fetch('/mode').then(r => r.json()).then(data => {
+      const sel = document.getElementById('agent-type-select');
+      if (data.docker) {
+        sel.innerHTML = '<option value="opencode">OpenCode</option><option value="mock">Mock（测试）</option>';
+      } else {
+        sel.innerHTML = '<option value="mock">Mock（测试）</option>';
+      }
+    });
+  </script>
 </body>
 </html>
