@@ -1,0 +1,41 @@
+export interface AgentOutput {
+  description: string;
+}
+
+export interface PlanEdge {
+  from_node_ids: number[];
+  direction_description: string;
+}
+
+export interface PlanOutput {
+  edges: PlanEdge[];
+  complete: boolean;
+  summary?: string;
+  evidence_node_ids?: number[];
+}
+
+export interface ActResult {
+  output: AgentOutput;
+  sessionId: string;
+}
+
+export interface AgentDriver {
+  executePlan(params: {
+    prompt: string;
+    workdir: string;
+    timeout: number;
+  }): Promise<PlanOutput>;
+
+  executeAct(params: {
+    prompt: string;
+    workdir: string;
+    timeout: number;
+  }): Promise<ActResult>;
+
+  conclude(params: {
+    sessionId: string;
+    prompt: string;
+    workdir: string;
+    timeout: number;
+  }): Promise<AgentOutput>;
+}
