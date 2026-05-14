@@ -47,28 +47,35 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
       return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function statusBadge(status: string) {
+    function statusBadge(status: string, isPlanning = false) {
       const map: Record<string, string> = {
         active: 'bg-emerald-900/50 text-emerald-400 border-emerald-800',
         completed: 'bg-blue-900/50 text-blue-400 border-blue-800',
         failed: 'bg-red-900/50 text-red-400 border-red-800',
         stopped: 'bg-gray-800 text-gray-400 border-gray-700',
       };
+      if (isPlanning) {
+        return `<span class="px-2 py-0.5 rounded-full text-xs border bg-emerald-900/50 text-emerald-400 border-emerald-800 animate-pulse">推理中</span>`;
+      }
       const cls = map[status] || 'bg-gray-800 text-gray-400 border-gray-700';
       return `<span class="px-2 py-0.5 rounded-full text-xs border ${cls}">${esc(status)}</span>`;
     }
 
-    const html = projects.map((p: any) => `
+    const html = projects.map((p: any) => {
+      const isPlanning = p.status === 'active' && !p.last_plan_at && p.edge_total === 0;
+      const statusLabel = isPlanning ? '推理中' : p.status;
+      return `
       <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-700 transition-colors">
         <div class="flex items-center justify-between">
           <div class="flex-1 min-w-0">
             <a href="/project.html?id=${p.id}" class="text-base font-medium hover:text-emerald-400 truncate block">${esc(p.title)}</a>
             <div class="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
-              ${statusBadge(p.status)}
+              ${statusBadge(statusLabel, isPlanning)}
               <span>Nodes: ${p.node_count}</span>
               <span>Edges: ${p.edge_total}</span>
               ${p.edge_unresulted > 0 ? `<span class="text-amber-400">待处理: ${p.edge_unresulted}</span>` : ''}
               ${p.edge_inflight > 0 ? `<span class="text-blue-400">执行中: ${p.edge_inflight}</span>` : ''}
+              ${isPlanning ? '<span class="text-emerald-400 animate-pulse">▊ Plan 推理中…</span>' : ''}
             </div>
           </div>
           <div class="flex gap-2 ml-4 shrink-0">
@@ -83,7 +90,7 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
           </div>
         </div>
       </div>
-    `).join('');
+    `}).join('');
 
     if (!html) {
       return reply.type('text/html').send('<div class="text-center text-gray-500 py-12">暂无项目</div>');
@@ -128,8 +135,7 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
 
     const { stopContainer } = await import('../docker/manager');
     stopContainer(id).catch(() => {});
-
-    return { status: 'stopped' };
+    return reply.header('HX-Trigger', 'projectUpdated').send({ status: 'stopped' });
   });
 
   // POST /projects/:id/push

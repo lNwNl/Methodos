@@ -29,10 +29,23 @@ function setupButtons(data) {
   const stopBtn = document.getElementById('stop-btn');
   const pushBtn = document.getElementById('push-btn');
   const summaryBar = document.getElementById('summary-bar');
+  const badge = document.getElementById('status-badge');
+
+  const statusMap = {
+    active: { cls: 'bg-emerald-900/50 text-emerald-400 border-emerald-800', label: '活跃' },
+    completed: { cls: 'bg-blue-900/50 text-blue-400 border-blue-800', label: '完成' },
+    failed: { cls: 'bg-red-900/50 text-red-400 border-red-800', label: '失败' },
+    stopped: { cls: 'bg-gray-800 text-gray-400 border-gray-700', label: '已暂停' },
+  };
+  const s = statusMap[data.status] || statusMap.active;
+  const isPlanning = data.status === 'active' && !data.last_plan_at && data.edges.length === 0;
+  badge.className = `px-2.5 py-1 rounded-full text-xs font-medium border ${s.cls}${isPlanning ? ' animate-pulse' : ''}`;
+  badge.textContent = isPlanning ? '▊ Plan 推理中…' : s.label;
 
   if (data.status === 'active') {
     stopBtn.classList.remove('hidden');
     stopBtn.setAttribute('hx-post', `/projects/${projectId}/stop`);
+    htmx.process(stopBtn);
     pushBtn.classList.add('hidden');
   } else if (data.status === 'stopped' || data.status === 'failed') {
     pushBtn.classList.remove('hidden');
@@ -191,7 +204,7 @@ function render(data) {
     showDetail('edge', edge.data());
   });
 
-  setTimeout(() => loadProject(), 5000);
+  setTimeout(() => loadProject(), 2000);
 }
 
 function showDetail(type, data) {

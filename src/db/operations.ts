@@ -272,7 +272,7 @@ export function setProjectLastPlanAt(
 export function listProjects(db: Database.Database) {
   return db.prepare(`
     SELECT
-      p.id, p.title, p.status, p.agent_type,
+      p.id, p.title, p.status, p.agent_type, p.last_plan_at,
       p.created_at, p.updated_at,
       COALESCE(n.node_count, 0) as node_count,
       COALESCE(e.edge_total, 0) as edge_total,

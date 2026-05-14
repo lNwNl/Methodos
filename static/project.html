@@ -15,7 +15,8 @@
   <div class="max-w-7xl mx-auto px-4 py-4">
     <div class="flex items-center justify-between mb-4">
       <a href="/" class="text-gray-400 hover:text-white text-sm">&larr; 返回</a>
-      <div class="flex gap-2">
+      <div class="flex items-center gap-3">
+        <span id="status-badge" class="px-2.5 py-1 rounded-full text-xs font-medium border bg-emerald-900/50 text-emerald-400 border-emerald-800">加载中...</span>
         <button id="stop-btn" class="px-3 py-1.5 text-xs rounded-lg bg-amber-900/50 text-amber-400 hover:bg-amber-900 border border-amber-800 transition-colors hidden"
           hx-post="" hx-swap="none">暂停</button>
         <button id="push-btn" class="px-3 py-1.5 text-xs rounded-lg bg-blue-900/50 text-blue-400 hover:bg-blue-900 border border-blue-800 transition-colors hidden"

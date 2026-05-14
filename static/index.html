@@ -48,8 +48,11 @@
       </div>
     </div>
 
-    <div hx-get="/projects-list" hx-trigger="load, every 5s, projectCreated, projectPushed" hx-swap="innerHTML" id="project-list">
-      <div class="text-center text-gray-500 py-12">加载中...</div>
+    <div hx-get="/projects-list" hx-trigger="load, every 2s, projectCreated, projectUpdated, projectPushed" hx-swap="innerHTML" id="project-list">
+      <div class="text-center text-gray-500 py-12">
+        <div class="inline-block w-5 h-5 border-2 border-gray-600 border-t-emerald-400 rounded-full animate-spin mr-2 align-middle"></div>
+        加载中...
+      </div>
     </div>
   </div>
 
