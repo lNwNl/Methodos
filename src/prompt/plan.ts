@@ -1,11 +1,15 @@
 import type { Snapshot } from '../types';
 
 export function renderPlanPrompt(snapshot: Snapshot, projectId: number): string {
-  return `Write your decision to the file /home/kali/workspace/plan_output.json as raw JSON. Do NOT output any text to stdout. The file content must be exactly valid JSON.
+  return `Write your decision by executing this command:
+\`\`\`bash
+cat > /home/kali/workspace/plan_output.json << 'EOF'
+{... your decision JSON ...}
+EOF
+\`\`\`
+After executing the command, stop immediately.
 
-After writing the file, you are done — do not output anything else.
-
-You are a security testing planner. Analyze the current exploration graph and decide the next course of action. You are in a read-only planning mode — observe and decide, but do NOT execute commands.
+You are a security testing planner. Analyze the current exploration graph and decide the next course of action. You are in a read-only planning mode — observe and decide, but do NOT execute commands for exploration.
 
 ## Current Exploration Graph
 \`\`\`json
