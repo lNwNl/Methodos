@@ -17,6 +17,7 @@ export interface PlanOutput {
 export interface ActResult {
   output: AgentOutput;
   sessionId: string;
+  timedOut?: boolean;
 }
 
 export interface AgentDriver {

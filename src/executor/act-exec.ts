@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { renderSnapshot } from '../snapshot/render';
 import { renderActPrompt } from '../prompt/act';
+import { renderConcludePrompt } from '../prompt/conclude';
 import { config } from '../config';
 import { claimEdge, writeActResult, handleActFailure, countActiveActs } from '../db/operations';
 import type { AgentDriver } from '../driver/types';
@@ -23,7 +24,6 @@ export function executeAct(
 ): Promise<{ success: boolean; edgeId?: number; error?: string }> {
   const edge = claimEdge(db, projectId, config.maxFailures, config.claimedExpiryMs, ts);
   if (!edge) {
-    // Normal: all unclaimed edges are currently claimed by other Acts
     return Promise.resolve({ success: false, edgeId: undefined, error: 'No unclaimed edge' });
   }
 
@@ -39,8 +39,24 @@ export function executeAct(
     prompt,
     workdir,
     timeout: config.actTimeoutMs,
-  }).then((result) => {
-    const parsed = agentOutputSchema.safeParse(result.output);
+  }).then(async (result) => {
+    // If timed out, attempt conclude phase first
+    let output = result.output;
+    if (result.timedOut && result.sessionId) {
+      const concludePrompt = renderConcludePrompt(snapshot, edge.direction_description, workdir);
+      try {
+        output = await driver.conclude({
+          sessionId: result.sessionId,
+          prompt: concludePrompt,
+          workdir,
+          timeout: config.actTimeoutMs,
+        });
+      } catch {
+        // Conclude failed too, use whatever output we have from the primary phase
+      }
+    }
+
+    const parsed = agentOutputSchema.safeParse(output);
     if (!parsed.success) {
       handleActFailure(db, projectId, edge.id, config.maxFailures, ts);
       return { success: false, edgeId: edge.id, error: `Invalid output: ${parsed.error.message}` };

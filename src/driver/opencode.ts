@@ -54,25 +54,72 @@ function extractAnyText(stdout: string): string {
 
 function parseStructuredOutput(stdout: string): any | null {
   const text = extractAnyText(stdout);
-  if (!text) {
-    // No text events — opencode may have used tools but produced no final answer
-    if (countToolUses(stdout) > 0) {
-      return { partial: true, description: 'Agent 执行了工具操作但未产出文本结论' };
+
+  // Try extracting from text events first
+  if (text) {
+    // Strategy 1: JSON in fenced block
+    const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const jsonText = fenceMatch ? fenceMatch[1].trim() : text;
+
+    // Strategy 2: parse the entire extracted text
+    try {
+      return JSON.parse(jsonText);
+    } catch {}
+
+    // Strategy 3: greedy regex for first { ... } block
+    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch {}
     }
-    return null;
+
+    return { description: text.trim() };
   }
 
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonText = fenceMatch ? fenceMatch[1].trim() : text;
+  // No text events — try position-scan on the FULL stdout (raw events)
+  if (countToolUses(stdout) > 0) {
+    // Strategy 4: position-scan — try every { position in stdout
+    const fullOut = stdout.trim();
+    for (let i = 0; i < fullOut.length; i++) {
+      if (fullOut[i] === '{') {
+        try {
+          const cand = JSON.parse(fullOut.slice(i));
+          if (cand && typeof cand === 'object' && !cand.type && !Array.isArray(cand)) {
+            return cand;
+          }
+        } catch {}
+      }
+    }
 
-  const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
+    // Extract useful info from tool outputs if no JSON found
+    const toolOutputs = extractToolOutputs(stdout);
+    if (toolOutputs) {
+      return { description: toolOutputs };
+    }
+
+    return { description: 'Agent 执行了工具操作但未产出文本结论' };
+  }
+
+  return null;
+}
+
+function extractToolOutputs(stdout: string): string | null {
+  const lines = stdout.trim().split('\n');
+  const outputs: string[] = [];
+  for (const line of lines) {
     try {
-      return JSON.parse(jsonMatch[0]);
+      const obj = JSON.parse(line);
+      if (obj.type === 'tool_use' && obj.part?.state?.output) {
+        const out = obj.part.state.output;
+        if (out && out.length > 10) {
+          outputs.push(out.slice(0, 200));
+        }
+      }
     } catch {}
   }
-
-  return { description: text.trim() };
+  if (outputs.length === 0) return null;
+  return outputs.join(' | ').slice(0, 500);
 }
 
 export class OpenCodeDriver implements AgentDriver {
@@ -142,6 +189,7 @@ export class OpenCodeDriver implements AgentDriver {
     return {
       output: { description: output.description || extractAnyText(result.stdout) },
       sessionId,
+      timedOut: result.exitCode === -1,
     };
   }
 

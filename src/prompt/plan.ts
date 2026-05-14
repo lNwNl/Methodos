@@ -1,39 +1,61 @@
 import type { Snapshot } from '../types';
 
 export function renderPlanPrompt(snapshot: Snapshot, projectId: number): string {
-  return `你处于只读规划模式，只能观察和思考，不能执行命令或修改文件。
+  return `Return only one raw JSON object. Do not output anything else. The JSON must be valid, including proper escaping of quotation marks.
 
-分析下方探索图，输出下一步行动的纯 JSON。
+You are a security testing planner. Analyze the current exploration graph and decide the next course of action. You are in a read-only planning mode — you observe and decide, but do NOT execute commands.
 
-## 当前探索图
+## Current Exploration Graph
 \`\`\`json
 ${JSON.stringify(snapshot, null, 2)}
 \`\`\`
 
-## 输出格式——只输出下面这个 JSON 对象，不要附加任何文字
+## Decision Rules
+Choose exactly one of the three outcomes below:
+
+### 1. Goal Achieved → complete: true
+Only when explicit proof of the original objective exists in the graph (flag captured, password obtained, shell established, target compromised). For penetration testing, mere information gathering is NEVER sufficient for completion.
+
+\`\`\`json
+{
+  "edges": [],
+  "complete": true,
+  "summary": "Brief description of what was achieved and why the task is complete.",
+  "evidence_node_ids": [1, 2, 3]
+}
+\`\`\`
+
+### 2. Continue Exploring → complete: false + edges
+When the goal is not yet achieved and new exploration directions are warranted.
+
 \`\`\`json
 {
   "edges": [
-    { "from_node_ids": [1], "direction_description": "具体的下一步探索方向描述" }
+    {
+      "from_node_ids": [1],
+      "direction_description": "Specific, actionable next step. E.g.: 'Use nmap to scan ports 1-1000 on target host'"
+    }
   ],
   "complete": false
 }
 \`\`\`
 
-## 判定规则（严格遵循）
-- **继续探索**：尚未达成原始目标 → \`"complete": false\` + 非空 \`edges\`
-  - 每条 edge 的 \`from_node_ids\` 必须引用已有 Node ID
-  - \`direction_description\` 要具体可执行，如"使用 nmap 扫描目标端口"、"访问登录页面测试 SQL 注入"
-- **任务达成**：已拿到原始目标要求的结果（如 flag、密码、proof）→ \`"complete": true\`
-  - \`edges\` 必须为 \`[]\`
-  - 附带 \`"summary"\` 说明判定依据
-  - 附带 \`"evidence_node_ids"\` 列出依据的 Node ID
-- **无法继续**：已穷尽所有方法但仍未达成目标 → \`"complete": false\` + \`edges: []\`
+### 3. Stuck → complete: false + empty edges
+When you have exhausted all reasonable exploration directions but the goal remains unachieved. This signals to the human operator that intervention is needed.
 
-## 渗透测试特殊规则
-- ❌ **禁止过早判定完成**——仅仅获取了页面信息、端口信息但未拿到 flag/密码/权限时，绝对不能 complete
-- ✅ 探索方向应针对"如何进一步渗透"而非"收集信息"
-- ✅ 优先考虑：漏洞扫描、弱口令测试、SQL 注入、目录爆破、已知 CVE 利用
+\`\`\`json
+{
+  "edges": [],
+  "complete": false
+}
+\`\`\`
+
+## Rules
+- Different edges should cover DIFFERENT exploration dimensions. Avoid duplication or heavy overlap.
+- Each edge's from_node_ids must reference existing Node IDs from the graph.
+- Each direction_description must be specific and actionable — a single concrete step, not a vague category.
+- For pentesting: only set complete: true when the actual objective is met (flag/password/shell). Information collection is NEVER completion.
+- Propose at most 3 edges per round — focus on the most promising directions.
 
 project_id: ${projectId}`;
 }
