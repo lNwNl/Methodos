@@ -1,5 +1,12 @@
 import type { AgentDriver, AgentOutput, ActResult, PlanOutput } from './types';
-import { execInContainer, writeFileInContainer, ensureWorkdir } from '../docker/exec';
+import { execInContainer, writeFileInContainer, ensureWorkdir, readFileFromContainer } from '../docker/exec';
+
+function parseJson(s: string): any | null {
+  try { return JSON.parse(s.trim()); } catch {}
+  const m = s.match(/\{[\s\S]*\}/);
+  if (m) { try { return JSON.parse(m[0]); } catch {} }
+  return null;
+}
 
 function findSessionId(stdout: string): string | null {
   const lines = stdout.trim().split('\n');
@@ -231,12 +238,13 @@ export class OpenCodeDriver implements AgentDriver {
     timeout: number;
   }): Promise<PlanOutput> {
     const promptPath = `${params.workdir}/plan_prompt.md`;
+    const outputPath = `${params.workdir}/plan_output.json`;
     await ensureWorkdir(this.projectId, params.workdir);
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
-    const result = await execInContainer(this.projectId, [
+    await execInContainer(this.projectId, [
       this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
-      '根据 prompt.md 中的探索图 snapshot 和指令，返回 JSON。',
+      '根据 plan_prompt.md 中的指令分析探索图。将结果写入 plan_output.json，然后停止。',
       '-f', promptPath,
     ], {
       workdir: params.workdir,
@@ -244,19 +252,22 @@ export class OpenCodeDriver implements AgentDriver {
       env: { OPENCODE_EXPERIMENTAL_PLAN_MODE: 'true' },
     });
 
-    const output = parseStructuredOutput(result.stdout);
-    if (!output) {
-      const diag = diagnoseStdout(result.stdout);
-      const hint = result.stderr ? ` | stderr: ${result.stderr.slice(0, 100)}` : '';
-      throw Object.assign(new Error(diag.message), { diag, hint });
+    // Primary: read the output file written by the model
+    const fileContent = await readFileFromContainer(this.projectId, outputPath);
+    if (fileContent) {
+      const output = parseJson(fileContent);
+      if (output) {
+        return {
+          edges: output.edges || [],
+          complete: output.complete || false,
+          summary: output.summary,
+          evidence_node_ids: output.evidence_node_ids,
+        };
+      }
+      throw new Error(`Plan output file is not valid JSON: ${fileContent.slice(0, 200)}`);
     }
 
-    return {
-      edges: output.edges || [],
-      complete: output.complete || false,
-      summary: output.summary,
-      evidence_node_ids: output.evidence_node_ids,
-    };
+    throw new Error('Plan did not produce output file. Model may have failed to execute.');
   }
 
   async executeAct(params: {
@@ -265,12 +276,13 @@ export class OpenCodeDriver implements AgentDriver {
     timeout: number;
   }): Promise<ActResult> {
     const promptPath = `${params.workdir}/act_prompt.md`;
+    const outputPath = `${params.workdir}/act_output.json`;
     await ensureWorkdir(this.projectId, params.workdir);
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
     const result = await execInContainer(this.projectId, [
       this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
-      '根据 prompt.md 中的指令执行探索。',
+      '根据 act_prompt.md 中的指令执行探索。将结果写入 act_output.json，然后停止。',
       '-f', promptPath,
     ], {
       workdir: params.workdir,
@@ -279,20 +291,27 @@ export class OpenCodeDriver implements AgentDriver {
     });
 
     const sessionId = findSessionId(result.stdout) || `fallback-${Date.now()}`;
-    const output = parseStructuredOutput(result.stdout);
 
-    if (!output) {
-      const diag = diagnoseStdout(result.stdout);
-      // Add partial info for no_text category — caller can retry or conclude
-      const hint = result.stderr ? ` | stderr: ${result.stderr.slice(0, 100)}` : '';
-      throw Object.assign(new Error(diag.message), { diag, hint, sessionId, timedOut: result.exitCode === -1 });
+    // Primary: read the output file
+    const fileContent = await readFileFromContainer(this.projectId, outputPath);
+    if (fileContent) {
+      const output = parseJson(fileContent);
+      if (output && output.description) {
+        return {
+          output: { description: output.description },
+          sessionId,
+          timedOut: result.exitCode === -1,
+        };
+      }
+      // If file exists but no description field, treat content as description
+      return {
+        output: { description: fileContent.trim().slice(0, 500) },
+        sessionId,
+        timedOut: result.exitCode === -1,
+      };
     }
 
-    return {
-      output: { description: output.description || extractAnyText(result.stdout) },
-      sessionId,
-      timedOut: result.exitCode === -1,
-    };
+    throw new Error('Act did not produce output file. Model may have failed to execute.');
   }
 
   async conclude(params: {
@@ -302,13 +321,14 @@ export class OpenCodeDriver implements AgentDriver {
     timeout: number;
   }): Promise<AgentOutput> {
     const promptPath = `${params.workdir}/conclude_prompt.md`;
+    const outputPath = `${params.workdir}/conclude_output.json`;
     await ensureWorkdir(this.projectId, params.workdir);
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
-    const result = await execInContainer(this.projectId, [
+    await execInContainer(this.projectId, [
       this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
       '--session', params.sessionId,
-      '停止探索，总结已有成果。',
+      '停止探索，总结已有成果。将结果写入 conclude_output.json，然后停止。',
       '-f', promptPath,
     ], {
       workdir: params.workdir,
@@ -316,12 +336,15 @@ export class OpenCodeDriver implements AgentDriver {
       env: { OPENCODE_DANGEROUSLY_SKIP_PERMISSIONS: 'true' },
     });
 
-    const output = parseStructuredOutput(result.stdout);
-    if (!output) {
-      const diag = diagnoseStdout(result.stdout);
-      throw Object.assign(new Error(diag.message), { diag });
+    const fileContent = await readFileFromContainer(this.projectId, outputPath);
+    if (fileContent) {
+      const output = parseJson(fileContent);
+      if (output && output.description) {
+        return { description: output.description };
+      }
+      return { description: fileContent.trim().slice(0, 500) };
     }
 
-    return { description: output.description || extractAnyText(result.stdout) };
+    throw new Error('Conclude did not produce output file.');
   }
 }

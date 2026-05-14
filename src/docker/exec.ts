@@ -83,3 +83,19 @@ export async function ensureWorkdir(
     }, () => resolve());
   });
 }
+
+export async function readFileFromContainer(
+  projectId: number,
+  containerPath: string,
+): Promise<string | null> {
+  const containerName = getContainerName(projectId);
+  return new Promise((resolve) => {
+    execFile(PODMAN, ['exec', containerName, 'cat', containerPath], {
+      timeout: 10000,
+      maxBuffer: 1024 * 1024,
+    }, (err, stdout) => {
+      if (err) { resolve(null); return; }
+      resolve(stdout || null);
+    });
+  });
+}
