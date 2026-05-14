@@ -3,7 +3,6 @@ import { z } from 'zod';
 export const createProjectSchema = z.object({
   title: z.string().min(1),
   agent_type: z.string().min(1),
-  image_tag: z.string().min(1),
 });
 
 export const pushProjectSchema = z.object({

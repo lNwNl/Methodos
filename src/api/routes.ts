@@ -10,7 +10,9 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database) {
       return reply.status(400).send({ error: parsed.error.issues });
     }
 
-    const { title, agent_type, image_tag } = parsed.data;
+    const { title, agent_type } = parsed.data;
+    const { config } = await import('../config');
+    const image_tag = config.agentImages[agent_type] || `${agent_type}:latest`;
     const ts = new Date().toISOString();
 
     const { createProject } = await import('../db/operations');
