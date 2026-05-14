@@ -28,15 +28,43 @@ function extractTextContent(stdout: string): string {
   return text;
 }
 
-function parseStructuredOutput(stdout: string): any | null {
-  const text = extractTextContent(stdout);
-  if (!text) return null;
+function countToolUses(stdout: string): number {
+  let count = 0;
+  for (const line of stdout.trim().split('\n')) {
+    try {
+      if (JSON.parse(line).type === 'tool_use') count++;
+    } catch {}
+  }
+  return count;
+}
 
-  // Try extracting JSON from code fence first
+function extractAnyText(stdout: string): string {
+  const lines = stdout.trim().split('\n');
+  const parts: string[] = [];
+  for (const line of lines) {
+    try {
+      const obj = JSON.parse(line);
+      if (obj.type === 'text' && obj.part?.text) {
+        parts.push(obj.part.text);
+      }
+    } catch {}
+  }
+  return parts.join('\n');
+}
+
+function parseStructuredOutput(stdout: string): any | null {
+  const text = extractAnyText(stdout);
+  if (!text) {
+    // No text events — opencode may have used tools but produced no final answer
+    if (countToolUses(stdout) > 0) {
+      return { partial: true, description: 'Agent 执行了工具操作但未产出文本结论' };
+    }
+    return null;
+  }
+
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const jsonText = fenceMatch ? fenceMatch[1].trim() : text;
 
-  // Try to extract a JSON object
   const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     try {
@@ -44,14 +72,13 @@ function parseStructuredOutput(stdout: string): any | null {
     } catch {}
   }
 
-  // Fallback: return the text as a description
   return { description: text.trim() };
 }
 
 export class OpenCodeDriver implements AgentDriver {
   constructor(
     private projectId: number,
-    private cliPath: string = '/usr/local/bin/opencode',
+    private cliPath: string = '/usr/bin/opencode',
   ) {}
 
   async executePlan(params: {

@@ -1,5 +1,8 @@
-import { docker, getContainerName } from './index';
+import { getContainerName } from './index';
 import { config } from '../config';
+import { execFile } from 'node:child_process';
+
+const PODMAN = process.env.DOCKER_BIN || 'podman';
 
 export interface ExecResult {
   stdout: string;
@@ -16,42 +19,28 @@ export async function execInContainer(
   } = {},
 ): Promise<ExecResult> {
   const containerName = getContainerName(projectId);
-  const container = docker.getContainer(containerName);
-
-  const exec = await container.exec({
-    Cmd: cmd,
-    WorkingDir: options.workdir || '/home/kali/workspace',
-    AttachStdout: true,
-    AttachStderr: true,
-  });
-
-  const stream = await exec.start({ Detach: false, Tty: false });
-
-  let stdout = '';
-  let stderr = '';
+  const args = ['exec'];
+  if (options.workdir) {
+    args.push('-w', options.workdir);
+  }
+  args.push(containerName, ...cmd);
 
   const timeout = options.timeout || config.actTimeoutMs;
 
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      stream.destroy();
-      resolve({ stdout, stderr, exitCode: -1 });
-    }, timeout);
-
-    container.modem.demuxStream(stream, {
-      write: (chunk: Buffer) => { stdout += chunk.toString(); },
-    }, {
-      write: (chunk: Buffer) => { stderr += chunk.toString(); },
-    });
-
-    stream.on('end', () => {
-      clearTimeout(timer);
-      resolve({ stdout, stderr, exitCode: 0 });
-    });
-
-    stream.on('error', (err: Error) => {
-      clearTimeout(timer);
-      reject(err);
+  return new Promise((resolve) => {
+    const child = execFile(PODMAN, args, {
+      timeout,
+      maxBuffer: 10 * 1024 * 1024,
+    }, (err, stdout, stderr) => {
+      if (err && (err as any).killed) {
+        resolve({ stdout, stderr, exitCode: -1 });
+        return;
+      }
+      resolve({
+        stdout: stdout || '',
+        stderr: stderr || '',
+        exitCode: err ? (err as any).code || 1 : 0,
+      });
     });
   });
 }
@@ -61,17 +50,30 @@ export async function writeFileInContainer(
   containerPath: string,
   content: string,
 ): Promise<void> {
-  const safePath = containerPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  const safeContent = JSON.stringify(content);
-  await execInContainer(projectId, [
-    'node', '-e',
-    `const fs=require("fs"),p=require("path");fs.mkdirSync(p.dirname("${safePath}"),{recursive:true});fs.writeFileSync("${safePath}",${safeContent})`,
-  ]);
+  const dirPath = containerPath.substring(0, containerPath.lastIndexOf('/'));
+  if (dirPath) {
+    await ensureWorkdir(projectId, dirPath);
+  }
+
+  // Use podman exec with stdin to write file content
+  const containerName = getContainerName(projectId);
+  return new Promise<void>((resolve) => {
+    const child = execFile(PODMAN, ['exec', '-i', containerName, 'tee', containerPath], {
+      timeout: 10000,
+    }, () => resolve());
+    child.stdin?.write(content);
+    child.stdin?.end();
+  });
 }
 
 export async function ensureWorkdir(
   projectId: number,
   workdir: string,
 ): Promise<void> {
-  await execInContainer(projectId, ['mkdir', '-p', workdir]);
+  const containerName = getContainerName(projectId);
+  return new Promise<void>((resolve) => {
+    execFile(PODMAN, ['exec', containerName, 'mkdir', '-p', workdir], {
+      timeout: 5000,
+    }, () => resolve());
+  });
 }

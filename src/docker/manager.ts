@@ -1,9 +1,10 @@
-import { docker, getContainerName } from './index';
+import { getContainerName } from './index';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { Container } from 'dockerode';
+import { execFile } from 'node:child_process';
 
 const home = homedir();
+const PODMAN = process.env.DOCKER_BIN || 'podman';
 
 function getOpenCodeBinds(): string[] {
   return [
@@ -13,58 +14,57 @@ function getOpenCodeBinds(): string[] {
   ];
 }
 
+function podman(args: string[], timeout = 30000): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(PODMAN, args, { timeout }, (err, stdout, stderr) => {
+      if (err) {
+        reject(Object.assign(err, { stdout, stderr }));
+        return;
+      }
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
 export async function ensureContainer(
   projectId: number,
   imageTag: string,
-): Promise<Container> {
+): Promise<void> {
   const name = getContainerName(projectId);
 
   try {
-    const container = docker.getContainer(name);
-    const info = await container.inspect();
-    if (!info.State.Running) {
-      await container.start();
+    const { stdout } = await podman(['inspect', name, '-f', '{{.State.Running}}']);
+    if (stdout.trim() === 'true') return;
+    if (stdout.trim() === 'false') {
+      await podman(['start', name]);
+      return;
     }
-    return container;
-  } catch (err: any) {
-    if (err.statusCode === 404) {
-      const container = await docker.createContainer({
-        name,
-        Image: imageTag,
-        Tty: true,
-        AttachStdin: false,
-        AttachStdout: false,
-        AttachStderr: false,
-        WorkingDir: '/home/kali/workspace',
-        HostConfig: {
-          AutoRemove: false,
-          Binds: getOpenCodeBinds(),
-        },
-      });
-      await container.start();
-      return container;
-    }
-    throw err;
+  } catch {}
+
+  const bindArgs: string[] = [];
+  for (const bind of getOpenCodeBinds()) {
+    bindArgs.push('-v', bind);
   }
+
+  await podman([
+    'run', '-d', '--name', name,
+    ...bindArgs,
+    '-w', '/home/kali/workspace',
+    imageTag, 'sleep', 'infinity',
+  ], 120000);
 }
 
 export async function stopContainer(projectId: number): Promise<void> {
   const name = getContainerName(projectId);
-  try {
-    const container = docker.getContainer(name);
-    await container.stop().catch(() => {});
-  } catch (err: any) {
-    if (err.statusCode !== 404) throw err;
-  }
+  await podman(['stop', name]).catch(() => {});
 }
 
 export async function containerExists(projectId: number): Promise<boolean> {
   const name = getContainerName(projectId);
   try {
-    await docker.getContainer(name).inspect();
+    await podman(['inspect', name]);
     return true;
-  } catch (err: any) {
-    if (err.statusCode === 404) return false;
-    throw err;
+  } catch {
+    return false;
   }
 }

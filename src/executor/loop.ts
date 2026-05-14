@@ -70,7 +70,7 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
 
           if (result.success) {
             logger.info({ projectId: pid, edgeId: result.edgeId }, 'Act completed');
-          } else {
+          } else if (result.error !== 'No unclaimed edge') {
             logger.warn({ projectId: pid, edgeId: result.edgeId, error: result.error }, 'Act failed');
           }
         });

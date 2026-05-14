@@ -22,7 +22,10 @@ export function executeAct(
   ts: string,
 ): Promise<{ success: boolean; edgeId?: number; error?: string }> {
   const edge = claimEdge(db, projectId, config.maxFailures, config.claimedExpiryMs, ts);
-  if (!edge) return Promise.resolve({ success: false, error: 'No unclaimed edge' });
+  if (!edge) {
+    // Normal: all unclaimed edges are currently claimed by other Acts
+    return Promise.resolve({ success: false, edgeId: undefined, error: 'No unclaimed edge' });
+  }
 
   const snapshot = renderSnapshot(db, projectId, {
     snapshotMaxNodes: config.snapshotMaxNodes,
