@@ -48,7 +48,11 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
         executePlan(db, pid, getDriver(pid, project.agent_type), ts).then((result) => {
           state.planInFlight.delete(pid);
           if (result.success) {
-            logger.info({ projectId: pid }, 'Plan completed successfully');
+            if (result.error) {
+              logger.info({ projectId: pid, reason: result.error }, 'Plan 判定无法继续');
+            } else {
+              logger.info({ projectId: pid }, 'Plan completed successfully');
+            }
           } else {
             const level = (result as any).logLevel === 'warn' ? 'warn' : 'error';
             logger[level]({ projectId: pid, error: result.error }, 'Plan failed');

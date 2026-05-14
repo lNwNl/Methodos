@@ -84,7 +84,7 @@ function writePlan(
       updateProject(db, projectId, { status: 'failed' }, ts);
     });
     failTxn();
-    return { success: true };
+    return { success: true, error: 'Plan 判定无法继续——探索方向耗尽，项目标记为 failed' };
   }
 
   const txn = db.transaction(() => {
