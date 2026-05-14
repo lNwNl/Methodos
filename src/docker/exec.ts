@@ -61,8 +61,12 @@ export async function writeFileInContainer(
   containerPath: string,
   content: string,
 ): Promise<void> {
-  const b64 = Buffer.from(content).toString('base64');
-  await execInContainer(projectId, ['sh', '-c', `mkdir -p "$(dirname '${containerPath}')" && echo '${b64}' | base64 -d > '${containerPath}'`]);
+  const safePath = containerPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const safeContent = JSON.stringify(content);
+  await execInContainer(projectId, [
+    'node', '-e',
+    `const fs=require("fs"),p=require("path");fs.mkdirSync(p.dirname("${safePath}"),{recursive:true});fs.writeFileSync("${safePath}",${safeContent})`,
+  ]);
 }
 
 export async function ensureWorkdir(
