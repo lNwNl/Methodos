@@ -38,6 +38,65 @@ function countToolUses(stdout: string): number {
   return count;
 }
 
+function countEventTypes(stdout: string) {
+  const counts: Record<string, number> = {};
+  for (const line of stdout.trim().split('\n')) {
+    try {
+      const obj = JSON.parse(line);
+      counts[obj.type] = (counts[obj.type] || 0) + 1;
+    } catch {}
+  }
+  return counts;
+}
+
+export type DiagCategory = 'exec_error' | 'llm_transient' | 'no_text' | 'bad_format' | 'unknown';
+
+export interface DiagResult {
+  category: DiagCategory;
+  message: string;
+}
+
+export function diagnoseStdout(stdout: string): DiagResult {
+  const s = stdout.trim();
+  if (!s) {
+    return { category: 'exec_error', message: '容器未返回任何输出，可能是启动失败或命令错误' };
+  }
+
+  const events = countEventTypes(s);
+
+  // Only step_start — LLM API failed or was killed before producing anything
+  if (events.step_start && !events.text && !events.tool_use && !events.step_finish) {
+    return { category: 'llm_transient', message: 'LLM API 未返回结果（瞬时故障），自动重试' };
+  }
+
+  // Ran tools but no text conclusion
+  if (events.tool_use && !events.text && events.step_finish) {
+    return { category: 'no_text', message: 'Agent 执行了工具但未产出文本结论' };
+  }
+
+  // Ran tools but never finished (no step_finish)
+  if (events.tool_use && !events.text && !events.step_finish) {
+    return { category: 'no_text', message: 'Agent 执行了工具但未产出文本结论（可能已超时）' };
+  }
+
+  // Has text but couldn't parse JSON from it
+  if (events.text && !events.tool_use) {
+    return { category: 'bad_format', message: 'Agent 返回了文本但不符合 JSON 格式' };
+  }
+
+  // Has both text and tools
+  if (events.text && events.tool_use) {
+    return { category: 'bad_format', message: 'Agent 执行了工具并返回了文本，但无法解析 JSON' };
+  }
+
+  // Step_start + step_finish only — ran briefly and exited
+  if (events.step_start && events.step_finish && !events.text && !events.tool_use) {
+    return { category: 'llm_transient', message: 'LLM 调用后立即退出未产生结果' };
+  }
+
+  return { category: 'unknown', message: '无法解析输出' };
+}
+
 function extractAnyText(stdout: string): string {
   const lines = stdout.trim().split('\n');
   const parts: string[] = [];
@@ -149,7 +208,9 @@ export class OpenCodeDriver implements AgentDriver {
 
     const output = parseStructuredOutput(result.stdout);
     if (!output) {
-      throw new Error(`Failed to parse Plan output from: ${result.stdout.slice(0, 300)}`);
+      const diag = diagnoseStdout(result.stdout);
+      const hint = result.stderr ? ` | stderr: ${result.stderr.slice(0, 100)}` : '';
+      throw Object.assign(new Error(diag.message), { diag, hint });
     }
 
     return {
@@ -183,7 +244,10 @@ export class OpenCodeDriver implements AgentDriver {
     const output = parseStructuredOutput(result.stdout);
 
     if (!output) {
-      throw new Error(`Failed to parse Act output from: ${result.stdout.slice(0, 300)}`);
+      const diag = diagnoseStdout(result.stdout);
+      // Add partial info for no_text category — caller can retry or conclude
+      const hint = result.stderr ? ` | stderr: ${result.stderr.slice(0, 100)}` : '';
+      throw Object.assign(new Error(diag.message), { diag, hint, sessionId, timedOut: result.exitCode === -1 });
     }
 
     return {
@@ -216,7 +280,8 @@ export class OpenCodeDriver implements AgentDriver {
 
     const output = parseStructuredOutput(result.stdout);
     if (!output) {
-      throw new Error(`Failed to parse Conclude output from: ${result.stdout.slice(0, 300)}`);
+      const diag = diagnoseStdout(result.stdout);
+      throw Object.assign(new Error(diag.message), { diag });
     }
 
     return { description: output.description || extractAnyText(result.stdout) };

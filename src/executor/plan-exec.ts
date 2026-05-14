@@ -50,7 +50,13 @@ export function executePlan(
   }).then((output) => {
     return writePlan(db, projectId, output, ts);
   }).catch((err) => {
-    return handlePlanFailure(db, projectId, ts, err.message);
+    const diag = (err as any).diag;
+    const cat = diag?.category || 'unknown';
+    // llm_transient is expected and auto-retried — use info level
+    const msg = cat === 'llm_transient'
+      ? `LLM API transient fault — auto-retrying (${err.message})`
+      : err.message;
+    return handlePlanFailure(db, projectId, ts, msg, cat === 'llm_transient' ? 'warn' : 'error');
   });
 }
 
@@ -62,7 +68,7 @@ function writePlan(
 ): { success: boolean; error?: string } {
   const parsed = planOutputSchema.safeParse(output);
   if (!parsed.success) {
-    return handlePlanFailure(db, projectId, ts, `Invalid JSON: ${parsed.error.message}`);
+    return handlePlanFailure(db, projectId, ts, `Plan JSON 格式错误: ${parsed.error.message}`, 'error');
   }
 
   const plan = parsed.data;
@@ -113,9 +119,10 @@ function handlePlanFailure(
   projectId: number,
   ts: string,
   error: string,
-): { success: boolean; error?: string } {
+  logLevel: 'error' | 'warn' = 'error',
+): { success: boolean; error?: string; logLevel?: string } {
   const project = getProject(db, projectId);
-  if (!project) return { success: false, error };
+  if (!project) return { success: false, error, logLevel };
 
   const newCount = project.failure_count + 1;
 
@@ -126,9 +133,9 @@ function handlePlanFailure(
         failureCount: newCount,
       }, ts);
     })();
-    return { success: false, error: `Plan failed ${newCount} times: ${error}. Project marked as failed.` };
+    return { success: false, error: `Plan 失败 ${newCount}/${config.maxFailures} 次: ${error}。项目标记为 failed。`, logLevel };
   }
 
   updateProject(db, projectId, { failureCount: newCount }, ts);
-  return { success: false, error };
+  return { success: false, error: `Plan ${newCount}/${config.maxFailures}: ${error}`, logLevel };
 }

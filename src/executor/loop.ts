@@ -50,7 +50,8 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
           if (result.success) {
             logger.info({ projectId: pid }, 'Plan completed successfully');
           } else {
-            logger.warn({ projectId: pid, error: result.error }, 'Plan failed');
+            const level = (result as any).logLevel === 'warn' ? 'warn' : 'error';
+            logger[level]({ projectId: pid, error: result.error }, 'Plan failed');
           }
         });
         continue;
