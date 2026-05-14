@@ -216,7 +216,7 @@ body {
 /* Detail panel */
 .detail-panel {
   display: flex; flex-direction: column;
-  width: 280px; flex-shrink: 0;
+  width: 320px; flex-shrink: 0;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);

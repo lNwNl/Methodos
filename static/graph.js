@@ -53,7 +53,7 @@ createApp({
       const elements = [];
       for (const n of p.nodes) {
         elements.push({
-          data: { id: `n${n.id}`, label: trunc(n.description, 55), createdBy: n.created_by, nodeId: n.id },
+          data: { id: `n${n.id}`, label: trunc(n.description, 55), description: n.description, createdBy: n.created_by, nodeId: n.id },
         });
       }
       for (const e of p.edges) {
@@ -61,13 +61,13 @@ createApp({
         for (const f of e.from_node_ids) {
           for (const t of e.to_node_ids) {
             elements.push({
-              data: { id: `e${e.id}_${f}_${t}`, source: `n${f}`, target: `n${t}`, label: trunc(e.direction_description, 40), edgeId: e.id, failureCount: e.failure_count },
+              data: { id: `e${e.id}_${f}_${t}`, source: `n${f}`, target: `n${t}`, label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id, failureCount: e.failure_count },
               classes: ok ? 'resulted' : 'pending',
             });
           }
           if (!ok) {
             elements.push({
-              data: { id: `e${e.id}_pending`, source: `n${f}`, target: `n${f}`, label: trunc(e.direction_description, 40), edgeId: e.id, failureCount: e.failure_count, pending: true },
+              data: { id: `e${e.id}_pending`, source: `n${f}`, target: `n${f}`, label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id, failureCount: e.failure_count, pending: true },
               classes: 'pending',
             });
           }
@@ -98,11 +98,11 @@ createApp({
 
       cy.on('tap', 'node', e => {
         const d = e.target.data();
-        selected.value = { type: 'node', nodeId: d.nodeId, createdBy: d.createdBy, description: d.label, data: d };
+        selected.value = { type: 'node', nodeId: d.nodeId, createdBy: d.createdBy, description: d.description, data: d };
       });
       cy.on('tap', 'edge', e => {
         const d = e.target.data();
-        selected.value = { type: 'edge', edgeId: d.edgeId, pending: d.pending, failureCount: d.failureCount, description: d.label, data: d };
+        selected.value = { type: 'edge', edgeId: d.edgeId, pending: d.pending, failureCount: d.failureCount, description: d.description, data: d };
       });
     }
 
@@ -177,7 +177,7 @@ createApp({
         </div>
 
         <!-- Side panel -->
-        <div class="detail-panel">
+        <div class="detail-panel" style="width:320px">
           <template v-if="selected">
             <div class="detail-title">{{ selected.type === 'node' ? 'Node #' + selected.nodeId : 'Edge #' + selected.edgeId }}</div>
             <div class="detail-field">
