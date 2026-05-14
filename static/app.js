@@ -206,6 +206,10 @@ function showDetail(type, data) {
       <p class="whitespace-pre-wrap">${data.label}</p>
     `;
   }
+
+  setTimeout(() => {
+    if (cy) { cy.resize(); cy.fit(); }
+  }, 50);
 }
 
 function truncate(text, max) {
