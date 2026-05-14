@@ -138,7 +138,24 @@ function parseStructuredOutput(stdout: string): any | null {
 
   // No text events — try position-scan on the FULL stdout (raw events)
   if (countToolUses(stdout) > 0) {
-    // Strategy 4: position-scan — try every { position in stdout
+    // Strategy 4: scan tool_use input fields for JSON (LLM writes via bash heredoc)
+    for (const line of stdout.trim().split('\n')) {
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'tool_use') {
+          const input = obj.part?.state?.input;
+          const cmd = typeof input === 'string' ? input : (input?.command || '');
+          const heredoc = cmd.match(/<<['"]?(\w+)['"]?\s*\n?([\s\S]*?)\1/);
+          if (heredoc) {
+            try {
+              return JSON.parse(heredoc[2].trim());
+            } catch {}
+          }
+        }
+      } catch {}
+    }
+
+    // Strategy 5: position-scan — try every { position in stdout
     const fullOut = stdout.trim();
     for (let i = 0; i < fullOut.length; i++) {
       if (fullOut[i] === '{') {
@@ -169,10 +186,27 @@ function extractToolOutputs(stdout: string): string | null {
   for (const line of lines) {
     try {
       const obj = JSON.parse(line);
-      if (obj.type === 'tool_use' && obj.part?.state?.output) {
-        const out = obj.part.state.output;
-        if (out && out.length > 10) {
-          outputs.push(out.slice(0, 200));
+      if (obj.type === 'tool_use') {
+        // Check tool output
+        const out = obj.part?.state?.output;
+        if (out && out.length > 10) outputs.push(out.slice(0, 200));
+
+        // Also check tool INPUT — LLM may write JSON via bash heredoc
+        const input = obj.part?.state?.input;
+        if (input) {
+          const cmd = typeof input === 'string' ? input : (input.command || '');
+          // Extract JSON from heredoc body (cat <<'X' ... X)
+          const heredoc = cmd.match(/<<['"]?(\w+)['"]?\s*\n?([\s\S]*?)\1/);
+          if (heredoc) {
+            const body = heredoc[2].trim();
+            // Try to parse as JSON
+            try {
+              const parsed = JSON.parse(body);
+              return `Tool output JSON: ${JSON.stringify(parsed)}`;
+            } catch {}
+            // Not JSON — treat as text
+            outputs.push(body.slice(0, 500));
+          }
         }
       }
     } catch {}
