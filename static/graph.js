@@ -45,36 +45,29 @@ createApp({
       window.dispatchEvent(new CustomEvent('theme-changed', { detail: { theme: next } }));
     }
 
+    function nodeInlineStyle(createdBy, theme) {
+      var s = CY_THEME[theme] || CY_THEME.light;
+      var bg, fg, bd, fw;
+      if (createdBy === 'human')       { bg = '#4F46E5'; bd = '#3730A3'; fg = '#FFFFFF'; fw = '500'; }
+      else if (createdBy === 'agent')  { bg = '#0D9488'; bd = '#0F766E'; fg = '#FFFFFF'; fw = '500'; }
+      else if (createdBy === 'system') { bg = '#D97706'; bd = '#B45309'; fg = '#FFFFFF'; fw = '500'; }
+      else                             { bg = s.nodeBg;  bd = s.nodeBorder; fg = s.nodeText; fw = '400'; }
+      return { 'background-color': bg, 'border-color': bd, 'color': fg, 'font-weight': fw };
+    }
+
+    function applyNodeInlineStyles(theme) {
+      if (!cy) return;
+      cy.nodes().forEach(function(node) {
+        var cb = node.data('createdBy');
+        if (cb) node.style(nodeInlineStyle(cb, theme));
+      });
+    }
+
     function applyCyTheme(theme) {
       if (!cy) return;
       var s = CY_THEME[theme] || CY_THEME.light;
-      function bg(ele) {
-        var cb = ele.data('createdBy');
-        if (cb === 'human') return NODE_COLORS.human;
-        if (cb === 'agent') return NODE_COLORS.agent;
-        if (cb === 'system') return NODE_COLORS.system;
-        return s.nodeBg;
-      }
-      function fg(ele) {
-        return ele.data('createdBy') ? '#FFFFFF' : s.nodeText;
-      }
-      function bd(ele) {
-        var cb = ele.data('createdBy');
-        if (cb === 'human') return '#3730A3';
-        if (cb === 'agent') return '#0F766E';
-        if (cb === 'system') return '#B45309';
-        return s.nodeBorder;
-      }
-      function fw(ele) {
-        return ele.data('createdBy') ? '500' : '400';
-      }
+      applyNodeInlineStyles(theme);
       cy.style()
-        .selector('node').style({
-          'background-color': bg,
-          'color': fg,
-          'border-color': bd,
-          'font-weight': fw,
-        })
         .selector('.resulted').style({
           'line-color': s.resultedLine,
           'target-arrow-color': s.resultedArrow,
@@ -277,28 +270,7 @@ createApp({
         container,
         elements,
         style: [
-          { selector: 'node', style: { 'label': 'data(label)', 'border-width': 1.5, 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300,
-            'background-color': function(ele) {
-              var cb = ele.data('createdBy');
-              if (cb === 'human') return '#4F46E5';
-              if (cb === 'agent') return '#0D9488';
-              if (cb === 'system') return '#D97706';
-              return s.nodeBg;
-            },
-            'color': function(ele) {
-              return ele.data('createdBy') ? '#FFFFFF' : s.nodeText;
-            },
-            'border-color': function(ele) {
-              var cb = ele.data('createdBy');
-              if (cb === 'human') return '#3730A3';
-              if (cb === 'agent') return '#0F766E';
-              if (cb === 'system') return '#B45309';
-              return s.nodeBorder;
-            },
-            'font-weight': function(ele) {
-              return ele.data('createdBy') ? '500' : '400';
-            },
-          } },
+          { selector: 'node', style: { 'label': 'data(label)', 'border-width': 1.5, 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
           { selector: '.resulted', style: { 'width': 1.5, 'line-color': s.resultedLine, 'target-arrow-color': s.resultedArrow, 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.resultedText, 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.pending', style: { 'width': 1.2, 'line-color': s.pendingLine, 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.pendingText, 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#6366F1', 'line-style': 'dashed', 'target-arrow-color': '#6366F1', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#6366F1', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
@@ -313,6 +285,7 @@ createApp({
         layout: layoutOpts(layoutKey.value),
       });
 
+      applyNodeInlineStyles(theme);
       applyEvidence(p);
       registerEvents();
     }
@@ -329,8 +302,11 @@ createApp({
       // Add new and sync classes/data for existing
       for (const [id, spec] of desired) {
         if (!current.has(id)) {
-          cy.add({ group: spec.group, data: spec.data, classes: spec.classes || '' });
+          const added = cy.add({ group: spec.group, data: spec.data, classes: spec.classes || '' });
           newIds.add(id);
+          if (spec.group === 'nodes' && spec.data.createdBy) {
+            added.style(nodeInlineStyle(spec.data.createdBy, currentTheme()));
+          }
         } else {
           const el = cy.getElementById(id);
           if (!el.length) continue;
@@ -346,7 +322,12 @@ createApp({
             }
           }
 
-          if (spec.data) el.data(spec.data);
+          if (spec.data) {
+            el.data(spec.data);
+            if (el.isNode() && el.data('createdBy')) {
+              el.style(nodeInlineStyle(el.data('createdBy'), currentTheme()));
+            }
+          }
         }
       }
 
