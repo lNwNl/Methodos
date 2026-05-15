@@ -95,7 +95,13 @@ export class OpenCodeDriver implements AgentDriver {
 
     const sessionId = findSessionId(result.stdout) || `fallback-${Date.now()}`;
     const output = await this.tryReadOutputFile(outputPath);
-    if (!output) throw this.outputFileError(outputPath);
+    if (!output) {
+      await writeFileInContainer(this.projectId,
+        `${params.workdir}/act_debug.log`,
+        `exit=${result.exitCode}\n---stdout---\n${result.stdout}\n---stderr---\n${result.stderr}`,
+      );
+      throw this.outputFileError(outputPath);
+    }
 
     return {
       output: { description: output.description || JSON.stringify(output) },
