@@ -11,6 +11,17 @@ createApp({
     const agents = ref([{ value: 'mock', label: 'Mock（测试）' }]);
     let timer = null;
 
+    function currentTheme() {
+      return document.documentElement.getAttribute('data-theme') || 'dark';
+    }
+
+    function toggleTheme() {
+      var next = currentTheme() === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('methodos-theme', next);
+      window.dispatchEvent(new CustomEvent('theme-changed', { detail: { theme: next } }));
+    }
+
     async function fetchMode() {
       try {
         const r = await fetch('/mode');
@@ -102,7 +113,7 @@ createApp({
 
     return {
       projects, loading, error, showModal, form, submitting, agents,
-      createProject, stopProject, pushProject, statusInfo,
+      createProject, stopProject, pushProject, statusInfo, toggleTheme,
     };
   },
 
@@ -114,6 +125,7 @@ createApp({
         <p>渗透测试自动化</p>
       </div>
       <div class="app-header-right">
+        <button class="theme-toggle" @click="toggleTheme" title="切换主题">◐</button>
         <button class="btn btn-primary" @click="showModal = true">+ 新建项目</button>
       </div>
     </div>
@@ -154,7 +166,7 @@ createApp({
       <div v-for="p in projects" :key="p.id" class="card">
         <div class="flex items-center justify-between">
           <div class="flex-1 min-w-0">
-            <a :href="'/project.html?id=' + p.id" class="truncate" style="font-size:0.82rem;font-weight:500;color:var(--text-bright);text-decoration:none;display:block">
+            <a :href="'/project.html?id=' + p.id" class="truncate" style="font-size:0.85rem;font-weight:500;color:var(--text-bright);text-decoration:none;display:block">
               {{ p.title.length > 80 ? p.title.slice(0,80)+'...' : p.title }}
             </a>
             <div class="stats-row">

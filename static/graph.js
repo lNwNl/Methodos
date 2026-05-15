@@ -17,6 +17,62 @@ createApp({
     const layoutKey = ref(localStorage.getItem('methodos-layout') || 'dagre_tb');
     const graphReady = ref(false);
     let cy = null;
+
+    const CY_THEME = {
+      dark: {
+        nodeBg: '#3A3E52', nodeBorder: '#2A2D3E', nodeText: '#CBD5E1',
+        resultedLine: '#4A4E62', resultedArrow: '#4A4E62', resultedText: '#64748B',
+        pendingLine: '#3A3E52', pendingText: '#64748B',
+        ghostBorder: '#3A3E52', tbg: '#1E2030',
+      },
+      light: {
+        nodeBg: '#E2E8F0', nodeBorder: '#CBD5E1', nodeText: '#334155',
+        resultedLine: '#94A3B8', resultedArrow: '#94A3B8', resultedText: '#64748B',
+        pendingLine: '#CBD5E1', pendingText: '#94A3B8',
+        ghostBorder: '#CBD5E1', tbg: '#FFFFFF',
+      },
+    };
+
+    function currentTheme() {
+      return document.documentElement.getAttribute('data-theme') || 'dark';
+    }
+
+    function toggleTheme() {
+      var next = currentTheme() === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('methodos-theme', next);
+      applyCyTheme(next);
+      window.dispatchEvent(new CustomEvent('theme-changed', { detail: { theme: next } }));
+    }
+
+    function applyCyTheme(theme) {
+      if (!cy) return;
+      var s = CY_THEME[theme] || CY_THEME.dark;
+      cy.style()
+        .selector('node').style({
+          'background-color': s.nodeBg,
+          'border-color': s.nodeBorder,
+          'color': s.nodeText,
+        })
+        .selector('.resulted').style({
+          'line-color': s.resultedLine,
+          'target-arrow-color': s.resultedArrow,
+          'color': s.resultedText,
+          'text-background-color': s.tbg,
+        })
+        .selector('.pending').style({
+          'line-color': s.pendingLine,
+          'color': s.pendingText,
+          'text-background-color': s.tbg,
+        })
+        .selector('.edge-running').style({
+          'text-background-color': s.tbg,
+        })
+        .selector('.ghost').style({ 'border-color': s.ghostBorder })
+        .selector('.dimmed').style({ 'opacity': 0.18 })
+        .selector('.focus').style({ 'border-color': '#F59E0B', 'border-width': 2.5 })
+        .update();
+    }
     let timer = null;
     let eventsReady = false;
     let resizing = false;
@@ -201,17 +257,17 @@ createApp({
         container,
         elements,
         style: [
-          { selector: 'node', style: { 'label': 'data(label)', 'background-color': '#3A3E52', 'border-width': 1.5, 'border-color': '#2A2D3E', 'font-size': '10px', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'color': '#CBD5E1', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
+          { selector: 'node', style: { 'label': 'data(label)', 'background-color': '#3A3E52', 'border-width': 1.5, 'border-color': '#2A2D3E', 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'color': '#CBD5E1', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
           { selector: 'node[createdBy="human"]', style: { 'background-color': NODE_COLORS.human, 'border-color': '#3C5DFF' } },
           { selector: 'node[createdBy="agent"]', style: { 'background-color': NODE_COLORS.agent, 'border-color': '#22C55E' } },
           { selector: 'node[createdBy="system"]', style: { 'background-color': NODE_COLORS.system, 'border-color': '#EF4444' } },
-          { selector: '.resulted', style: { 'width': 1.5, 'line-color': '#4A4E62', 'target-arrow-color': '#4A4E62', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', ...TBG } },
-          { selector: '.pending', style: { 'width': 1.2, 'line-color': '#3A3E52', 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'font-family': 'Inter, sans-serif', ...TBG } },
-          { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#3C5DFF', 'line-style': 'dashed', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#3C5DFF', 'font-family': 'Inter, sans-serif', ...TBG } },
+          { selector: '.resulted', style: { 'width': 1.5, 'line-color': '#4A4E62', 'target-arrow-color': '#4A4E62', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#64748B', 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', ...TBG } },
+          { selector: '.pending', style: { 'width': 1.2, 'line-color': '#3A3E52', 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#64748B', 'font-family': 'Inter, sans-serif', ...TBG } },
+          { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#3C5DFF', 'line-style': 'dashed', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#3C5DFF', 'font-family': 'Inter, sans-serif', ...TBG } },
           { selector: '.conclusion', style: { 'width': 2.5, 'line-color': '#3C5DFF', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'straight', 'line-style': 'solid' } },
           { selector: '.ghost', style: { 'width': 8, 'height': 8, 'background-color': 'transparent', 'border-width': 1.5, 'border-color': '#3A3E52', 'border-style': 'dashed', 'border-opacity': 0.35 } },
           { selector: '.ghost-running', style: { 'width': 9, 'height': 9, 'background-color': '#3C5DFF', 'background-opacity': 0.15, 'border-width': 1.5, 'border-color': '#3C5DFF', 'border-style': 'dashed', 'border-opacity': 0.5 } },
-          { selector: '.complete-node', style: { 'shape': 'round-rectangle', 'background-color': '#3C5DFF', 'border-width': 1.5, 'border-color': '#3C5DFF', 'font-size': '10px', 'font-weight': '600', 'color': '#FFFFFF', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'font-family': 'Inter, sans-serif' } },
+          { selector: '.complete-node', style: { 'shape': 'round-rectangle', 'background-color': '#3C5DFF', 'border-width': 1.5, 'border-color': '#3C5DFF', 'font-size': '11px', 'font-weight': '600', 'color': '#FFFFFF', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'font-family': 'Inter, sans-serif' } },
           { selector: '.evidence', style: { 'border-color': '#F59E0B', 'border-width': 2.5 } },
           { selector: '.dimmed', style: { 'opacity': 0.18 } },
           { selector: '.focus', style: { 'border-color': '#F59E0B', 'border-width': 2.5 } },
@@ -220,6 +276,7 @@ createApp({
       });
 
       applyEvidence(p);
+      applyCyTheme(currentTheme());
       registerEvents();
     }
 
@@ -438,15 +495,16 @@ createApp({
     return {
       project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, LAYOUT_NAMES, graphReady,
       stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, evidenceNodesDesc,
-      startPanelResize, setLayout,
+      startPanelResize, setLayout, toggleTheme,
     };
   },
 
   template: `
   <div style="display:flex;flex-direction:column;height:100vh;padding:0.75rem 1rem;gap:0.5rem">
-    <div class="flex items-center justify-between shrink-0">
+      <div class="flex items-center justify-between shrink-0">
       <a href="/" class="back-link">&larr; 返回</a>
       <div v-if="project" class="flex items-center gap-2">
+        <button class="theme-toggle" @click="toggleTheme" title="切换主题">◐</button>
         <span :class="'badge ' + statusInfo(project).cls">{{ statusInfo(project).label }}</span>
         <button v-if="project.status === 'active'" class="btn btn-warning btn-sm" @click="stopProject">暂停</button>
         <button v-if="project.status !== 'active'" class="btn btn-primary btn-sm" @click="showPushModal = true">推进</button>
