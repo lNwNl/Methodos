@@ -3,7 +3,7 @@ const projectId = params.get('id');
 
 const NODE_COLORS = { human: '#3C5DFF', agent: '#22C55E', system: '#EF4444' };
 
-const { createApp, ref, reactive, onMounted, onBeforeUnmount, nextTick } = Vue;
+const { createApp, ref, onMounted, onBeforeUnmount, nextTick } = Vue;
 
 createApp({
   setup() {
@@ -16,19 +16,29 @@ createApp({
     const panelWidth = ref(Number(localStorage.getItem('methodos-panel-width') || 320));
     let cy = null;
     let timer = null;
+    let eventsReady = false;
     let resizing = false;
     let resizeStartX = 0;
     let resizeStartW = 0;
+    const draggedPositions = new Map();
+
+    const TRANSIENT_CLASSES = new Set(['dimmed', 'focus', 'evidence']);
+    const TBG = {
+      'text-background-color': '#1E2030',
+      'text-background-opacity': 0.85,
+      'text-background-padding': '2px',
+      'text-background-shape': 'round-rectangle',
+    };
 
     function statusInfo(p) {
       if (p.status === 'active' && !p.last_plan_at && p.edges.length === 0) {
         return { cls: 'badge-planning', label: '推理中' };
       }
       const m = {
-        active:    { cls: 'badge-active',    label: '活跃' },
+        active: { cls: 'badge-active', label: '活跃' },
         completed: { cls: 'badge-completed', label: '完成' },
-        failed:    { cls: 'badge-failed',    label: '失败' },
-        stopped:   { cls: 'badge-stopped',   label: '暂停' },
+        failed: { cls: 'badge-failed', label: '失败' },
+        stopped: { cls: 'badge-stopped', label: '暂停' },
       };
       return m[p.status] || m.active;
     }
@@ -48,22 +58,18 @@ createApp({
       }
     }
 
-    function renderGraph() {
-      const p = project.value;
-      if (!p) return;
-      const container = document.getElementById('graph');
-      if (!container) return;
+    // ---- Build desired element map from project data ----
 
-      const hadIds = cy ? new Set(cy.elements().map(el => el.id())) : new Set();
-      if (cy) cy.destroy();
-
-      const elements = [];
-      const isCompleted = p.status === 'completed';
+    function buildDesired(p) {
+      const desired = new Map();
       const existingNodeIds = new Set(p.nodes.map(n => n.id));
+      const isCompleted = p.status === 'completed';
 
       for (const n of p.nodes) {
-        elements.push({
+        desired.set(`n${n.id}`, {
+          group: 'nodes',
           data: { id: `n${n.id}`, label: trunc(n.description, 55), description: n.description, createdBy: n.created_by, nodeId: n.id },
+          classes: '',
         });
       }
 
@@ -74,18 +80,21 @@ createApp({
         for (const f of e.from_node_ids) {
           if (ok) {
             for (const t of e.to_node_ids) {
-              elements.push({
+              desired.set(`e${e.id}_${f}_${t}`, {
+                group: 'edges',
                 data: { id: `e${e.id}_${f}_${t}`, source: `n${f}`, target: `n${t}`, label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id, failureCount: e.failure_count },
                 classes: 'resulted',
               });
             }
           } else {
             const ghostId = `ghost_e${e.id}_${f}`;
-            elements.push({
+            desired.set(ghostId, {
+              group: 'nodes',
               data: { id: ghostId, label: '', ghost: true, edgeId: e.id, running },
               classes: running ? 'ghost-running' : 'ghost',
             });
-            elements.push({
+            desired.set(`e${e.id}_${f}_pending`, {
+              group: 'edges',
               data: { id: `e${e.id}_${f}_pending`, source: `n${f}`, target: ghostId, label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id, pending: true, running },
               classes: running ? 'edge-running' : 'pending',
             });
@@ -95,33 +104,57 @@ createApp({
 
       if (isCompleted) {
         const evidenceIds = (p.evidence_node_ids || []).filter(id => existingNodeIds.has(id));
-
-        elements.push({
+        desired.set('complete_node', {
+          group: 'nodes',
           data: { id: 'complete_node', label: '✓ 探索完成', complete: true, summary: p.summary, evidenceIds },
           classes: 'complete-node',
         });
-
         for (const nid of evidenceIds) {
-          elements.push({
+          desired.set(`conc_${nid}`, {
+            group: 'edges',
             data: { id: `conc_${nid}`, source: `n${nid}`, target: 'complete_node', label: '', conclusion: true },
             classes: 'conclusion',
           });
         }
       }
 
-      const tbg = { 'text-background-color': '#1E2030', 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' };
+      return desired;
+    }
+
+    // ---- Core render ----
+
+    function renderGraph() {
+      const p = project.value;
+      if (!p) return;
+      const container = document.getElementById('graph');
+      if (!container) return;
+
+      const desired = buildDesired(p);
+
+      if (!cy) {
+        initGraph(container, desired, p);
+      } else {
+        updateGraph(desired, p);
+      }
+    }
+
+    function initGraph(container, desired, p) {
+      const elements = [];
+      for (const [, spec] of desired) {
+        elements.push({ group: spec.group, data: spec.data, classes: spec.classes || '' });
+      }
 
       cy = cytoscape({
         container,
         elements,
         style: [
           { selector: 'node', style: { 'label': 'data(label)', 'background-color': '#3A3E52', 'border-width': 1.5, 'border-color': '#2A2D3E', 'font-size': '10px', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'color': '#CBD5E1', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
-          { selector: 'node[createdBy="human"]',  style: { 'background-color': NODE_COLORS.human, 'border-color': '#3C5DFF' } },
-          { selector: 'node[createdBy="agent"]',  style: { 'background-color': NODE_COLORS.agent, 'border-color': '#22C55E' } },
+          { selector: 'node[createdBy="human"]', style: { 'background-color': NODE_COLORS.human, 'border-color': '#3C5DFF' } },
+          { selector: 'node[createdBy="agent"]', style: { 'background-color': NODE_COLORS.agent, 'border-color': '#22C55E' } },
           { selector: 'node[createdBy="system"]', style: { 'background-color': NODE_COLORS.system, 'border-color': '#EF4444' } },
-          { selector: '.resulted', style: { 'width': 1.5, 'line-color': '#4A4E62', 'target-arrow-color': '#4A4E62', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', ...tbg } },
-          { selector: '.pending', style: { 'width': 1.2, 'line-color': '#3A3E52', 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'font-family': 'Inter, sans-serif', ...tbg } },
-          { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#3C5DFF', 'line-style': 'dashed', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#3C5DFF', 'font-family': 'Inter, sans-serif', ...tbg } },
+          { selector: '.resulted', style: { 'width': 1.5, 'line-color': '#4A4E62', 'target-arrow-color': '#4A4E62', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', ...TBG } },
+          { selector: '.pending', style: { 'width': 1.2, 'line-color': '#3A3E52', 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'font-family': 'Inter, sans-serif', ...TBG } },
+          { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#3C5DFF', 'line-style': 'dashed', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#3C5DFF', 'font-family': 'Inter, sans-serif', ...TBG } },
           { selector: '.conclusion', style: { 'width': 2.5, 'line-color': '#3C5DFF', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'straight', 'line-style': 'solid' } },
           { selector: '.ghost', style: { 'width': 8, 'height': 8, 'background-color': 'transparent', 'border-width': 1.5, 'border-color': '#3A3E52', 'border-style': 'dashed', 'border-opacity': 0.35 } },
           { selector: '.ghost-running', style: { 'width': 9, 'height': 9, 'background-color': '#3C5DFF', 'background-opacity': 0.15, 'border-width': 1.5, 'border-color': '#3C5DFF', 'border-style': 'dashed', 'border-opacity': 0.5 } },
@@ -133,26 +166,87 @@ createApp({
         layout: { name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true, fit: true, padding: 50 },
       });
 
-      for (const id of (p.evidence_node_ids || [])) {
-        const n = cy.getElementById(`n${id}`);
-        if (n.length) n.addClass('evidence');
+      applyEvidence(p);
+      registerEvents();
+    }
+
+    function updateGraph(desired, p) {
+      const current = new Set(cy.elements().map(el => el.id()));
+      const newIds = new Set();
+
+      // Remove stale elements
+      cy.elements().forEach(el => {
+        if (!desired.has(el.id())) cy.remove(el);
+      });
+
+      // Add new and sync classes/data for existing
+      for (const [id, spec] of desired) {
+        if (!current.has(id)) {
+          cy.add({ group: spec.group, data: spec.data, classes: spec.classes || '' });
+          newIds.add(id);
+        } else {
+          const el = cy.getElementById(id);
+          if (!el.length) continue;
+
+          if (spec.classes !== undefined) {
+            const cur = el.classes().filter(c => !TRANSIENT_CLASSES.has(c)).sort().join(' ');
+            const des = (spec.classes || '').split(' ').filter(Boolean).sort().join(' ');
+            if (cur !== des) {
+              el.classes().filter(c => !TRANSIENT_CLASSES.has(c)).forEach(c => el.removeClass(c));
+              (spec.classes || '').split(' ').filter(Boolean).forEach(c => {
+                if (!el.hasClass(c)) el.addClass(c);
+              });
+            }
+          }
+
+          if (spec.data) el.data(spec.data);
+        }
       }
 
-      // Fade-in new elements from this poll cycle
-      setTimeout(() => {
-        const fresh = cy.elements().filter(el => !hadIds.has(el.id()));
-        if (fresh.length > 0 && fresh.length < cy.elements().length) {
-          fresh.style('opacity', 0);
-          fresh.animate({ style: { opacity: 1 } }, { duration: 350, easing: 'ease-in-out-cubic' });
-        }
-      }, 80);
+      applyEvidence(p);
 
-      // Tap: node
+      if (newIds.size > 0) {
+        cy.layout({
+          name: 'dagre',
+          rankDir: 'TB',
+          spacingFactor: 1.4,
+          nodeDimensionsIncludeLabels: true,
+          fit: true,
+          padding: 50,
+        }).run();
+        restoreDragged();
+        const fresh = cy.elements().filter(el => newIds.has(el.id()));
+        if (fresh.length) {
+          fresh.style('opacity', 0);
+          setTimeout(() => {
+            fresh.animate({ style: { opacity: 1 } }, { duration: 350, easing: 'ease-in-out-cubic' });
+          }, 30);
+        }
+      }
+    }
+
+    function applyEvidence(p) {
+      if (!cy) return;
+      const evidenceSet = new Set((p.evidence_node_ids || []).map(id => `n${id}`));
+      cy.nodes().forEach(n => {
+        if (evidenceSet.has(n.id())) {
+          if (!n.hasClass('evidence')) n.addClass('evidence');
+        } else {
+          if (n.hasClass('evidence')) n.removeClass('evidence');
+        }
+      });
+    }
+
+    // ---- Events ----
+
+    function registerEvents() {
+      if (!cy || eventsReady) return;
+      eventsReady = true;
+
       cy.on('tap', 'node', e => {
         const d = e.target.data();
         if (d.ghost) {
-          const status = d.running ? '执行中' : '待执行';
-          selected.value = { type: 'ghost', edgeId: d.edgeId, status };
+          selected.value = { type: 'ghost', edgeId: d.edgeId, status: d.running ? '执行中' : '待执行' };
           highlightNode(e.target);
         } else if (d.complete) {
           selected.value = { type: 'complete', summary: d.summary, evidenceIds: d.evidenceIds || [] };
@@ -163,7 +257,6 @@ createApp({
         }
       });
 
-      // Tap: edge
       cy.on('tap', 'edge', e => {
         const d = e.target.data();
         if (d.conclusion) {
@@ -176,12 +269,17 @@ createApp({
         highlightEdge(e.target);
       });
 
-      // Tap: background — clear selection
       cy.on('tap', e => {
         if (e.target === cy) {
           selected.value = null;
           clearHighlight();
         }
+      });
+
+      cy.on('free', 'node', e => {
+        const node = e.target;
+        const pos = node.position();
+        draggedPositions.set(node.id(), { x: pos.x, y: pos.y });
       });
     }
 
@@ -207,6 +305,13 @@ createApp({
       cy.elements().removeClass('dimmed').removeClass('focus');
     }
 
+    function restoreDragged() {
+      for (const [id, pos] of draggedPositions) {
+        const node = cy.getElementById(id);
+        if (node.length) node.position(pos);
+      }
+    }
+
     // ---- Panel resize ----
 
     function startPanelResize(e) {
@@ -222,8 +327,7 @@ createApp({
 
     function onPanelResize(e) {
       if (!resizing) return;
-      const dx = resizeStartX - e.clientX;
-      panelWidth.value = Math.max(240, Math.min(640, resizeStartW + dx));
+      panelWidth.value = Math.max(240, Math.min(640, resizeStartW + (resizeStartX - e.clientX)));
       localStorage.setItem('methodos-panel-width', panelWidth.value);
       if (cy) { cy.resize(); setTimeout(() => cy.fit(undefined, 50), 50); }
     }
@@ -236,15 +340,29 @@ createApp({
       document.body.style.userSelect = '';
     }
 
-    // ---- Layout ----
+    // ---- Zoom ----
 
-    function zoomIn()  { if (cy) { cy.zoom(cy.zoom() * 1.2); } }
+    function zoomIn() { if (cy) { cy.zoom(cy.zoom() * 1.2); } }
     function zoomOut() { if (cy) { cy.zoom(cy.zoom() / 1.2); } }
     function zoomFit() { if (cy) { cy.fit(undefined, 50); } }
 
+    // ---- Actions ----
+
     async function stopProject() {
-      try { await fetch(`/projects/${projectId}/stop`, { method: 'POST' }); fetchProject(); } catch {}
+      try { await fetch(`/projects/${projectId}/stop`, { method: 'POST' }); fetchProject(); } catch { }
     }
+
+    async function confirmPush() {
+      const nodes = pushNodes.value.filter(n => n.description.trim()).map(n => ({ description: n.description.trim() }));
+      try {
+        await fetch(`/projects/${projectId}/push`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nodes }) });
+        showPushModal.value = false;
+        pushNodes.value = [{ description: '' }];
+        fetchProject();
+      } catch { }
+    }
+
+    function addNode() { pushNodes.value.push({ description: '' }); }
 
     function trunc(s, max) {
       if (!s) return '';
@@ -260,17 +378,7 @@ createApp({
       });
     }
 
-    async function confirmPush() {
-      const nodes = pushNodes.value.filter(n => n.description.trim()).map(n => ({ description: n.description.trim() }));
-      try {
-        await fetch(`/projects/${projectId}/push`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nodes }) });
-        showPushModal.value = false;
-        pushNodes.value = [{ description: '' }];
-        fetchProject();
-      } catch {}
-    }
-
-    function addNode() { pushNodes.value.push({ description: '' }); }
+    // ---- Lifecycle ----
 
     onMounted(() => {
       fetchProject();
@@ -278,19 +386,18 @@ createApp({
     });
     onBeforeUnmount(() => {
       clearInterval(timer);
-      if (cy) cy.destroy();
+      if (cy) { cy.destroy(); cy = null; eventsReady = false; }
     });
 
     return {
       project, loading, error, selected, showPushModal, pushNodes, panelWidth,
       stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, evidenceNodesDesc,
-      startPanelResize, zoomFit,
+      startPanelResize,
     };
   },
 
   template: `
   <div style="display:flex;flex-direction:column;height:100vh;padding:0.75rem 1rem;gap:0.5rem">
-    <!-- Top bar -->
     <div class="flex items-center justify-between shrink-0">
       <a href="/" class="back-link">&larr; 返回</a>
       <div v-if="project" class="flex items-center gap-2">
@@ -301,7 +408,6 @@ createApp({
     </div>
 
     <div v-if="loading" class="empty-state flex-1"><span class="spinner"></span> 加载中...</div>
-
     <div v-else-if="error" class="empty-state flex-1" style="color:var(--danger)">{{ error }}</div>
 
     <template v-else-if="project">
@@ -311,7 +417,6 @@ createApp({
       </div>
 
       <div class="flex flex-1 min-h-0" style="flex:1;min-height:0;gap:0">
-        <!-- Graph -->
         <div class="graph-container flex-1" style="flex:1;min-width:0;border-right:none">
           <div class="graph-toolbar">
             <button class="btn" @click="zoomOut" title="缩小">−</button>
@@ -321,13 +426,10 @@ createApp({
           <div id="graph" class="w-full h-full"></div>
         </div>
 
-        <!-- Resize handle -->
         <div class="panel-resize-handle" @mousedown="startPanelResize"></div>
 
-        <!-- Side panel -->
         <div class="detail-panel" :style="{ width: panelWidth + 'px', flexShrink: '0' }">
           <template v-if="selected">
-
             <template v-if="selected.type === 'ghost'">
               <div class="detail-title">探索点 #{{ selected.edgeId }}</div>
               <div class="detail-field">
@@ -410,7 +512,6 @@ createApp({
       </div>
     </template>
 
-    <!-- Push modal -->
     <Transition name="fade">
     <div v-if="showPushModal" class="modal-backdrop" @click.self="showPushModal = false">
       <div class="modal-panel">
