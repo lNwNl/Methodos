@@ -28,13 +28,9 @@ export class OpenCodeDriver implements AgentDriver {
   ) {}
 
   private async tryReadOutputFile(path: string): Promise<any | null> {
-    // Wait for model to write file — may take a while if LLM is still running tools
-    for (let i = 0; i < 30; i++) {
-      const content = await readFileFromContainer(this.projectId, path);
-      if (content) return parseJson(content);
-      await new Promise(r => setTimeout(r, 2000));
-    }
-    return null;
+    const content = await readFileFromContainer(this.projectId, path);
+    if (!content) return null;
+    return parseJson(content);
   }
 
   private outputFileError(path: string): Error {
