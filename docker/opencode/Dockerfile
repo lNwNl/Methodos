@@ -14,7 +14,9 @@ RUN npm install -g opencode-ai@1.14.50
 COPY validate-json.js /usr/local/bin/validate-json
 RUN chmod +x /usr/local/bin/validate-json
 
-RUN mkdir -p /home/kali/workspace
+RUN mkdir -p /home/kali/workspace && \
+    mkdir -p /home/kali/workspace/.opencode && \
+    echo '{"permission":{"*":{"*":"allow"}}}' > /home/kali/workspace/.opencode/opencode.json
 
 WORKDIR /home/kali/workspace
 
