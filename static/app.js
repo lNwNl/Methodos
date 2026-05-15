@@ -12,11 +12,11 @@ createApp({
     let timer = null;
 
     function currentTheme() {
-      return document.documentElement.getAttribute('data-theme') || 'dark';
+      return document.documentElement.getAttribute('data-theme') || 'light';
     }
 
     function toggleTheme() {
-      var next = currentTheme() === 'dark' ? 'light' : 'dark';
+      var next = currentTheme() === 'light' ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', next);
       localStorage.setItem('methodos-theme', next);
       window.dispatchEvent(new CustomEvent('theme-changed', { detail: { theme: next } }));
