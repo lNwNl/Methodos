@@ -48,13 +48,16 @@ export class OpenCodeDriver implements AgentDriver {
     await ensureWorkdir(this.projectId, params.workdir);
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
+    const timeoutSec = Math.floor(params.timeout / 1000);
+
     await execInContainer(this.projectId, [
+      'timeout', String(timeoutSec),
       this.cliPath, 'run', '--format', 'json', '--pure', '--dangerously-skip-permissions', '--dir', params.workdir,
       `Follow plan_prompt.md to write and validate plan_output_${params.round}.json, then stop.`,
       '-f', promptPath,
     ], {
       workdir: params.workdir,
-      timeout: params.timeout,
+      timeout: params.timeout + 5000,
     });
 
     const output = await this.tryReadOutputFile(outputPath);
@@ -78,13 +81,16 @@ export class OpenCodeDriver implements AgentDriver {
     await ensureWorkdir(this.projectId, params.workdir);
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
+    const timeoutSec = Math.floor(params.timeout / 1000);
+
     const result = await execInContainer(this.projectId, [
+      'timeout', String(timeoutSec),
       this.cliPath, 'run', '--format', 'json', '--pure', '--dangerously-skip-permissions', '--dir', params.workdir,
       'Follow act_prompt.md to write and validate act_output.json, then stop.',
       '-f', promptPath,
     ], {
       workdir: params.workdir,
-      timeout: params.timeout,
+      timeout: params.timeout + 5000,
     });
 
     const sessionId = findSessionId(result.stdout) || `fallback-${Date.now()}`;
@@ -94,7 +100,7 @@ export class OpenCodeDriver implements AgentDriver {
     return {
       output: { description: output.description || JSON.stringify(output) },
       sessionId,
-      timedOut: result.exitCode === -1,
+      timedOut: result.exitCode === 124 || result.exitCode === -1,
     };
   }
 
@@ -109,14 +115,17 @@ export class OpenCodeDriver implements AgentDriver {
     await ensureWorkdir(this.projectId, params.workdir);
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
+    const timeoutSec = Math.floor(params.timeout / 1000);
+
     await execInContainer(this.projectId, [
+      'timeout', String(timeoutSec),
       this.cliPath, 'run', '--format', 'json', '--pure', '--dangerously-skip-permissions', '--dir', params.workdir,
       '--session', params.sessionId,
       '停止探索，总结已有成果。将结果写入 conclude_output.json，然后停止。',
       '-f', promptPath,
     ], {
       workdir: params.workdir,
-      timeout: params.timeout,
+      timeout: params.timeout + 5000,
     });
 
     const output = await this.tryReadOutputFile(outputPath);
