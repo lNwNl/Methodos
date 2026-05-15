@@ -15,6 +15,7 @@ createApp({
     const pushNodes = ref([{ description: '' }]);
     const panelWidth = ref(Number(localStorage.getItem('methodos-panel-width') || 320));
     const layoutKey = ref(localStorage.getItem('methodos-layout') || 'dagre_tb');
+    const panelTab = ref(selected.value ? 'detail' : 'log');
     const graphReady = ref(false);
     let completedSelected = false;
     let cy = null;
@@ -416,6 +417,7 @@ createApp({
 
       cy.on('tap', 'node', e => {
         const d = e.target.data();
+        panelTab.value = 'detail';
         if (d.ghost) {
           selected.value = { type: 'ghost', edgeId: d.edgeId, status: d.running ? '执行中' : '待执行' };
           highlightNode(e.target);
@@ -430,6 +432,7 @@ createApp({
 
       cy.on('tap', 'edge', e => {
         const d = e.target.data();
+        panelTab.value = 'detail';
         if (d.conclusion) {
           selected.value = { type: 'conclusion', source: d.source };
         } else if (d.pending || d.running) {
@@ -549,6 +552,72 @@ createApp({
       });
     }
 
+    function buildLog() {
+      const p = project.value;
+      if (!p) return [];
+      const log = [];
+      const edgeMap = new Map();
+      for (const e of p.edges) edgeMap.set(e.id, e);
+      for (const n of p.nodes) {
+        const edge = n.edge_id ? edgeMap.get(n.edge_id) : null;
+        const fromDesc = edge ? edge.title || trunc(edge.direction_description, 20) : '';
+        log.push({
+          type: 'node',
+          createdBy: n.created_by,
+          title: n.title || trunc(n.description, 15),
+          description: n.description,
+          time: n.created_at,
+          nodeId: n.id,
+          edgeId: n.edge_id,
+          fromDesc,
+        });
+      }
+      for (const e of p.edges) {
+        let status = 'planned';
+        if (e.to_node_ids.length > 0) status = 'completed';
+        else if (e.claimed_at) status = 'running';
+        log.push({
+          type: 'edge',
+          status,
+          title: e.title || trunc(e.direction_description, 15),
+          description: e.direction_description,
+          time: e.created_at,
+          edgeId: e.id,
+          failureCount: e.failure_count,
+        });
+      }
+      log.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+      return log;
+    }
+
+    function selectLogEntry(entry) {
+      const p = project.value;
+      if (!p) return;
+      panelTab.value = 'detail';
+      if (entry.type === 'node') {
+        const n = (p.nodes || []).find(nd => nd.id === entry.nodeId);
+        if (n) {
+          selected.value = { type: 'node', nodeId: n.id, createdBy: n.created_by, title: n.title, description: n.description, data: {} };
+          nextTick(() => {
+            const el = cy.getElementById('n' + n.id);
+            if (el.length) { clearHighlight(); highlightNode(el); }
+          });
+        }
+      } else if (entry.type === 'edge') {
+        const e = (p.edges || []).find(ed => ed.id === entry.edgeId);
+        if (e) {
+          const pending = e.to_node_ids.length === 0;
+          selected.value = { type: 'edge', edgeId: e.id, pending, failureCount: e.failure_count, title: e.title, description: e.direction_description, data: {} };
+          nextTick(() => {
+            if (e.from_node_ids.length > 0 && e.to_node_ids.length > 0) {
+              const edgeEl = cy.getElementById('e' + e.id + '_' + e.from_node_ids[0] + '_' + e.to_node_ids[0]);
+              if (edgeEl.length) { clearHighlight(); highlightEdge(edgeEl); }
+            }
+          });
+        }
+      }
+    }
+
     // ---- Lifecycle ----
 
     onMounted(() => {
@@ -561,8 +630,8 @@ createApp({
     });
 
     return {
-      project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, LAYOUT_NAMES, graphReady,
-      stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, evidenceNodesDesc,
+      project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, panelTab, LAYOUT_NAMES, graphReady,
+      stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, evidenceNodesDesc, buildLog, selectLogEntry,
       startPanelResize, setLayout, toggleTheme,
     };
   },
@@ -602,6 +671,12 @@ createApp({
         <div class="panel-resize-handle" @mousedown="startPanelResize"></div>
 
         <div class="detail-panel" :style="{ width: panelWidth + 'px', flexShrink: '0' }">
+          <div class="panel-tabs">
+            <button class="panel-tab" :class="{ active: panelTab === 'detail' }" @click="panelTab = 'detail'">详情</button>
+            <button class="panel-tab" :class="{ active: panelTab === 'log' }" @click="panelTab = 'log'">日志</button>
+          </div>
+
+          <template v-if="panelTab === 'detail'">
           <template v-if="selected">
             <template v-if="selected.type === 'ghost'">
               <div class="detail-title">探索点 #{{ selected.edgeId }}</div>
@@ -681,6 +756,27 @@ createApp({
           <div v-else class="detail-panel-empty">
             点击节点或边<br>查看详细信息
           </div>
+          </template>
+
+          <template v-else>
+          <div class="log-list" v-if="buildLog().length">
+            <div v-for="entry in buildLog()" :key="entry.type + '_' + (entry.nodeId || entry.edgeId) + '_' + entry.time" class="log-entry" @click="selectLogEntry(entry)">
+              <div class="log-dot" :style="{ background: entry.type === 'node' ? (entry.createdBy === 'human' ? '#4F46E5' : entry.createdBy === 'agent' ? '#0D9488' : '#78716C') : entry.status === 'completed' ? 'var(--success)' : entry.status === 'running' ? 'var(--primary)' : 'var(--text-dim)' }"></div>
+              <div class="log-content">
+                <div class="log-header">
+                  <span class="log-title">{{ entry.title }}</span>
+                  <span v-if="entry.type === 'node'" class="log-tag" :style="{ background: entry.createdBy === 'human' ? 'rgba(79,70,229,0.12)' : entry.createdBy === 'agent' ? 'rgba(13,148,136,0.12)' : 'rgba(120,113,108,0.12)', color: entry.createdBy === 'human' ? '#4F46E5' : entry.createdBy === 'agent' ? '#0D9488' : '#78716C' }">{{ entry.createdBy }}</span>
+                  <span v-else class="log-tag" :style="{ background: entry.status === 'completed' ? 'rgba(34,197,94,0.12)' : entry.status === 'running' ? 'rgba(60,93,255,0.12)' : 'rgba(148,163,184,0.12)', color: entry.status === 'completed' ? 'var(--success)' : entry.status === 'running' ? 'var(--primary)' : 'var(--text-dim)' }">{{ entry.status === 'completed' ? '完成' : entry.status === 'running' ? '执行中' : '新方向' }}</span>
+                </div>
+                <div class="log-desc">{{ entry.type === 'node' ? entry.description : entry.description }}</div>
+                <div v-if="entry.fromDesc" class="log-desc" style="font-size:0.65rem;opacity:0.6">来自: {{ entry.fromDesc }}</div>
+                <div v-if="entry.failureCount > 0" class="log-desc" style="color:var(--danger);font-size:0.65rem">失败 {{ entry.failureCount }} 次</div>
+                <div class="log-time">{{ entry.time }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="detail-panel-empty">暂无日志</div>
+          </template>
         </div>
       </div>
     </template>
