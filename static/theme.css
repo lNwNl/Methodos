@@ -212,6 +212,15 @@ body {
   font-size: 0.75rem;
   border-color: var(--border);
 }
+.graph-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface);
+}
 .layout-select {
   background: rgba(30,32,48,0.85);
   backdrop-filter: blur(4px);

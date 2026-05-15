@@ -15,6 +15,7 @@ createApp({
     const pushNodes = ref([{ description: '' }]);
     const panelWidth = ref(Number(localStorage.getItem('methodos-panel-width') || 320));
     const layoutKey = ref(localStorage.getItem('methodos-layout') || 'dagre_tb');
+    const graphReady = ref(false);
     let cy = null;
     let timer = null;
     let eventsReady = false;
@@ -100,11 +101,12 @@ createApp({
         }
         project.value = data;
         error.value = '';
+        loading.value = false;
         await nextTick();
         renderGraph();
+        graphReady.value = true;
       } catch (e) {
         error.value = `无法加载: ${e.message}`;
-      } finally {
         loading.value = false;
       }
     }
@@ -434,7 +436,7 @@ createApp({
     });
 
     return {
-      project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, LAYOUT_NAMES,
+      project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, LAYOUT_NAMES, graphReady,
       stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, evidenceNodesDesc,
       startPanelResize, setLayout,
     };
@@ -461,7 +463,10 @@ createApp({
       </div>
 
       <div class="flex flex-1 min-h-0" style="flex:1;min-height:0;gap:0">
-        <div class="graph-container flex-1" style="flex:1;min-width:0;border-right:none">
+        <div class="graph-container flex-1" style="flex:1;min-width:0;border-right:none;position:relative">
+          <div v-if="!graphReady" class="graph-loading-overlay">
+            <span class="spinner"></span>
+          </div>
           <div class="graph-toolbar">
             <button class="btn" @click="zoomOut" title="缩小">−</button>
             <button class="btn" @click="zoomIn"  title="放大">+</button>
