@@ -68,5 +68,8 @@ export function initDb() {
     );
   `);
 
+  // Migration: add plan_round column if missing (added after initial schema)
+  try { sqlite.exec(`ALTER TABLE projects ADD COLUMN plan_round INTEGER NOT NULL DEFAULT 0`); } catch {}
+
   return getDb();
 }
