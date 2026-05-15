@@ -6,7 +6,6 @@
     }
   },
   "plugin": [
-    "opencode-rules@latest",
-    "superpowers@git+https://github.com/obra/superpowers.git"
+    "opencode-rules@latest"
   ]
 }

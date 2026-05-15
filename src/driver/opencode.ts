@@ -52,7 +52,7 @@ export class OpenCodeDriver implements AgentDriver {
 
     await execInContainer(this.projectId, [
       'timeout', String(timeoutSec),
-      this.cliPath, 'run', '--format', 'json', '--pure', '--dangerously-skip-permissions', '--dir', params.workdir,
+      this.cliPath, 'run', '--format', 'json',  '--dangerously-skip-permissions', '--dir', params.workdir,
       `Follow plan_prompt.md to write and validate plan_output_${params.round}.json, then stop.`,
       '-f', promptPath,
     ], {
@@ -85,7 +85,7 @@ export class OpenCodeDriver implements AgentDriver {
 
     const result = await execInContainer(this.projectId, [
       'timeout', String(timeoutSec),
-      this.cliPath, 'run', '--format', 'json', '--pure', '--dangerously-skip-permissions', '--dir', params.workdir,
+      this.cliPath, 'run', '--format', 'json',  '--dangerously-skip-permissions', '--dir', params.workdir,
       'Follow act_prompt.md to write and validate act_output.json, then stop.',
       '-f', promptPath,
     ], {
@@ -119,7 +119,7 @@ export class OpenCodeDriver implements AgentDriver {
 
     await execInContainer(this.projectId, [
       'timeout', String(timeoutSec),
-      this.cliPath, 'run', '--format', 'json', '--pure', '--dangerously-skip-permissions', '--dir', params.workdir,
+      this.cliPath, 'run', '--format', 'json',  '--dangerously-skip-permissions', '--dir', params.workdir,
       '--session', params.sessionId,
       '停止探索，总结已有成果。将结果写入 conclude_output.json，然后停止。',
       '-f', promptPath,

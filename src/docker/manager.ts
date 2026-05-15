@@ -73,9 +73,11 @@ async function injectOpencodeConfig(containerName: string): Promise<void> {
   // Add terminal MCP
   merged.mcp.terminal = { type: 'local', command: ['uvx', 'terminal-mcp'] };
 
-  // Copy plugins from host
+  // Copy plugins from host, excluding superpowers
   if (hostConfig.plugin) {
-    merged.plugin = hostConfig.plugin;
+    merged.plugin = hostConfig.plugin.filter(
+      (p: string) => !p.includes('superpowers')
+    );
   }
 
   return new Promise<void>((resolve) => {
