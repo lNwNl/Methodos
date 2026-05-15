@@ -48,29 +48,32 @@ createApp({
     function applyCyTheme(theme) {
       if (!cy) return;
       var s = CY_THEME[theme] || CY_THEME.light;
+      function bg(ele) {
+        var cb = ele.data('createdBy');
+        if (cb === 'human') return NODE_COLORS.human;
+        if (cb === 'agent') return NODE_COLORS.agent;
+        if (cb === 'system') return NODE_COLORS.system;
+        return s.nodeBg;
+      }
+      function fg(ele) {
+        return ele.data('createdBy') ? '#FFFFFF' : s.nodeText;
+      }
+      function bd(ele) {
+        var cb = ele.data('createdBy');
+        if (cb === 'human') return '#3730A3';
+        if (cb === 'agent') return '#0F766E';
+        if (cb === 'system') return '#B45309';
+        return s.nodeBorder;
+      }
+      function fw(ele) {
+        return ele.data('createdBy') ? '500' : '400';
+      }
       cy.style()
         .selector('node').style({
-          'background-color': s.nodeBg,
-          'border-color': s.nodeBorder,
-          'color': s.nodeText,
-        })
-        .selector('.type-human').style({
-          'background-color': NODE_COLORS.human,
-          'border-color': '#3730A3',
-          'color': '#FFFFFF',
-          'font-weight': '500',
-        })
-        .selector('.type-agent').style({
-          'background-color': NODE_COLORS.agent,
-          'border-color': '#0F766E',
-          'color': '#FFFFFF',
-          'font-weight': '500',
-        })
-        .selector('.type-system').style({
-          'background-color': NODE_COLORS.system,
-          'border-color': '#B45309',
-          'color': '#FFFFFF',
-          'font-weight': '500',
+          'background-color': bg,
+          'color': fg,
+          'border-color': bd,
+          'font-weight': fw,
         })
         .selector('.resulted').style({
           'line-color': s.resultedLine,
@@ -274,10 +277,28 @@ createApp({
         container,
         elements,
         style: [
-          { selector: 'node', style: { 'label': 'data(label)', 'background-color': s.nodeBg, 'border-width': 1.5, 'border-color': s.nodeBorder, 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'color': s.nodeText, 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
-          { selector: '.type-human',  style: { 'background-color': NODE_COLORS.human, 'border-color': '#3730A3', 'color': '#FFFFFF', 'font-weight': '500' } },
-          { selector: '.type-agent',  style: { 'background-color': NODE_COLORS.agent, 'border-color': '#0F766E', 'color': '#FFFFFF', 'font-weight': '500' } },
-          { selector: '.type-system', style: { 'background-color': NODE_COLORS.system, 'border-color': '#B45309', 'color': '#FFFFFF', 'font-weight': '500' } },
+          { selector: 'node', style: { 'label': 'data(label)', 'border-width': 1.5, 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300,
+            'background-color': function(ele) {
+              var cb = ele.data('createdBy');
+              if (cb === 'human') return '#4F46E5';
+              if (cb === 'agent') return '#0D9488';
+              if (cb === 'system') return '#D97706';
+              return s.nodeBg;
+            },
+            'color': function(ele) {
+              return ele.data('createdBy') ? '#FFFFFF' : s.nodeText;
+            },
+            'border-color': function(ele) {
+              var cb = ele.data('createdBy');
+              if (cb === 'human') return '#3730A3';
+              if (cb === 'agent') return '#0F766E';
+              if (cb === 'system') return '#B45309';
+              return s.nodeBorder;
+            },
+            'font-weight': function(ele) {
+              return ele.data('createdBy') ? '500' : '400';
+            },
+          } },
           { selector: '.resulted', style: { 'width': 1.5, 'line-color': s.resultedLine, 'target-arrow-color': s.resultedArrow, 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.resultedText, 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.pending', style: { 'width': 1.2, 'line-color': s.pendingLine, 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.pendingText, 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#6366F1', 'line-style': 'dashed', 'target-arrow-color': '#6366F1', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#6366F1', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
