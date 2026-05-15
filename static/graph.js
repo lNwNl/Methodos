@@ -51,28 +51,82 @@ createApp({
       if (!container) return;
 
       const elements = [];
+      const isCompleted = p.status === 'completed';
+
+      // Nodes (real)
+      const nodeIds = new Set();
       for (const n of p.nodes) {
+        nodeIds.add(n.id);
         elements.push({
           data: { id: `n${n.id}`, label: trunc(n.description, 55), description: n.description, createdBy: n.created_by, nodeId: n.id },
         });
       }
+
+      // Edges
+      let anyTerminal = false;
       for (const e of p.edges) {
         const ok = e.to_node_ids.length > 0;
+        const running = !ok && e.claimed_at !== null;
+
         for (const f of e.from_node_ids) {
-          for (const t of e.to_node_ids) {
+          if (ok) {
+            // Realized edges: source → target
+            for (const t of e.to_node_ids) {
+              elements.push({
+                data: { id: `e${e.id}_${f}_${t}`, source: `n${f}`, target: `n${t}`, label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id, failureCount: e.failure_count },
+                classes: 'resulted',
+              });
+            }
+          } else if (isCompleted) {
+            // Completed project: terminal edges → COMPLETE
+            anyTerminal = true;
             elements.push({
-              data: { id: `e${e.id}_${f}_${t}`, source: `n${f}`, target: `n${t}`, label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id, failureCount: e.failure_count },
-              classes: ok ? 'resulted' : 'pending',
+              data: { id: `e${e.id}_${f}_terminal`, source: `n${f}`, target: 'complete_node', label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id },
+              classes: 'terminal',
             });
-          }
-          if (!ok) {
+          } else {
+            // Pending/running: source → ghost placeholder
+            const ghostId = `ghost_e${e.id}_${f}`;
             elements.push({
-              data: { id: `e${e.id}_pending`, source: `n${f}`, target: `n${f}`, label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id, failureCount: e.failure_count, pending: true },
-              classes: 'pending',
+              data: { id: ghostId, label: '', ghost: true, edgeId: e.id, running },
+              classes: running ? 'ghost-running' : 'ghost',
+            });
+            elements.push({
+              data: { id: `e${e.id}_${f}_pending`, source: `n${f}`, target: ghostId, label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id, pending: true, running },
+              classes: running ? 'edge-running' : 'pending',
             });
           }
         }
       }
+
+      // Synthetic COMPLETE node
+      if (isCompleted) {
+        elements.push({
+          data: { id: 'complete_node', label: '完成', complete: true, summary: p.summary },
+          classes: 'complete-node',
+        });
+      }
+
+      // All real node ids also include the COMPLETE node for dangling-cleanup check below
+      const allRealIds = new Set([...nodeIds, 'complete_node']);
+
+      // Remove any ghost nodes that now have real counterparts
+      // (edge case: old ghost IDs if rendering partially overlaps)
+      elements.filter(el => el.data.id.startsWith('ghost_')).forEach(el => {
+        const ghostId = el.data.id;
+        // Check if this ghost's corresponding real nodes exist
+        // Ghost id format: ghost_e{edgeId}_{fromId}
+        const match = ghostId.match(/^ghost_e(\d+)_(\d+)$/);
+        if (match) {
+          const edgeId = parseInt(match[1], 10);
+          const edge = p.edges.find(e => e.id === edgeId);
+          if (edge && edge.to_node_ids.some(tid => allRealIds.has(tid))) {
+            // This ghost has been realized — but the real edge is already drawn above.
+            // Filter out the ghost from elements.
+            // We'll do a pass after this.
+          }
+        }
+      });
 
       if (cy) cy.destroy();
 
@@ -80,29 +134,61 @@ createApp({
         container,
         elements,
         style: [
+          // Node base
           { selector: 'node', style: { 'label': 'data(label)', 'background-color': '#3A3E52', 'border-width': 1.5, 'border-color': '#2A2D3E', 'font-size': '10px', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'color': '#CBD5E1', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif' } },
+          // Node colors
           { selector: 'node[createdBy="human"]',  style: { 'background-color': NODE_COLORS.human, 'border-color': '#3C5DFF' } },
           { selector: 'node[createdBy="agent"]',  style: { 'background-color': NODE_COLORS.agent, 'border-color': '#22C55E' } },
           { selector: 'node[createdBy="system"]', style: { 'background-color': NODE_COLORS.system, 'border-color': '#EF4444' } },
+          // Resulted edge
           { selector: '.resulted', style: { 'width': 1.5, 'line-color': '#4A4E62', 'target-arrow-color': '#4A4E62', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif' } },
+          // Pending edge (not yet claimed)
           { selector: '.pending', style: { 'width': 1.2, 'line-color': '#3A3E52', 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'font-family': 'Inter, sans-serif' } },
+          // Running edge (claimed, executing)
+          { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#3C5DFF', 'line-style': 'dashed', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#3C5DFF', 'font-family': 'Inter, sans-serif' } },
+          // Terminal → COMPLETE edge
+          { selector: '.terminal', style: { 'width': 2, 'line-color': '#22C55E', 'target-arrow-color': '#22C55E', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#22C55E', 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif' } },
+          // Ghost placeholder node (pending)
+          { selector: '.ghost', style: { 'width': 8, 'height': 8, 'background-color': 'transparent', 'border-width': 1.5, 'border-color': '#3A3E52', 'border-style': 'dashed', 'border-opacity': 0.35 } },
+          // Ghost placeholder node (running)
+          { selector: '.ghost-running', style: { 'width': 9, 'height': 9, 'background-color': '#3C5DFF', 'background-opacity': 0.15, 'border-width': 1.5, 'border-color': '#3C5DFF', 'border-style': 'dashed', 'border-opacity': 0.5 } },
+          // COMPLETE node
+          { selector: '.complete-node', style: { 'shape': 'diamond', 'background-color': '#059669', 'border-width': 2, 'border-color': '#047857', 'font-size': '13px', 'font-weight': 'bold', 'color': '#FFFFFF', 'text-valign': 'center', 'text-halign': 'center', 'padding': '14px', 'width': 72, 'height': 72, 'font-family': 'Inter, sans-serif' } },
+          // Evidence highlight
           { selector: '.evidence', style: { 'border-color': '#F59E0B', 'border-width': 2.5 } },
         ],
         layout: { name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true },
       });
 
+      // Evidence node highlight
       for (const id of (p.evidence_node_ids || [])) {
         const n = cy.getElementById(`n${id}`);
         if (n.length) n.addClass('evidence');
       }
 
+      // Tap: node
       cy.on('tap', 'node', e => {
         const d = e.target.data();
-        selected.value = { type: 'node', nodeId: d.nodeId, createdBy: d.createdBy, description: d.description, data: d };
+        if (d.ghost) {
+          const status = d.running ? '执行中' : '待执行';
+          selected.value = { type: 'ghost', edgeId: d.edgeId, status };
+        } else if (d.complete) {
+          selected.value = { type: 'complete', summary: d.summary };
+        } else {
+          selected.value = { type: 'node', nodeId: d.nodeId, createdBy: d.createdBy, description: d.description, data: d };
+        }
       });
+
+      // Tap: edge
       cy.on('tap', 'edge', e => {
         const d = e.target.data();
-        selected.value = { type: 'edge', edgeId: d.edgeId, pending: d.pending, failureCount: d.failureCount, description: d.description, data: d };
+        if (d.pending || d.running) {
+          selected.value = { type: 'edge', edgeId: d.edgeId, pending: true, running: d.running, description: d.description, data: d };
+        } else if (d.edgeId) {
+          const target = d.target;
+          const isTerminal = target === 'complete_node';
+          selected.value = { type: 'edge', edgeId: d.edgeId, isTerminal, failureCount: d.failureCount, description: d.description, data: d };
+        }
       });
     }
 
@@ -179,19 +265,65 @@ createApp({
         <!-- Side panel -->
         <div class="detail-panel" style="width:320px">
           <template v-if="selected">
-            <div class="detail-title">{{ selected.type === 'node' ? 'Node #' + selected.nodeId : 'Edge #' + selected.edgeId }}</div>
-            <div class="detail-field">
-              <div class="detail-label">来源</div>
-              <div class="detail-value">{{ selected.type === 'node' ? selected.createdBy : (selected.pending ? '待执行' : '已完成') }}</div>
-            </div>
-            <div v-if="selected.type === 'edge' && selected.failureCount > 0" class="detail-field">
-              <div class="detail-label">失败次数</div>
-              <div class="detail-value" style="color:var(--danger)">{{ selected.failureCount }}</div>
-            </div>
-            <div class="detail-field">
-              <div class="detail-label">{{ selected.type === 'node' ? '描述' : '探索方向' }}</div>
-              <div class="detail-value">{{ selected.description }}</div>
-            </div>
+            <!-- Ghost placeholder -->
+            <template v-if="selected.type === 'ghost'">
+              <div class="detail-title">探索点 #{{ selected.edgeId }}</div>
+              <div class="detail-field">
+                <div class="detail-label">状态</div>
+                <div class="detail-value" :style="{ color: selected.status === '执行中' ? 'var(--primary)' : 'var(--text-dim)' }">{{ selected.status }}</div>
+              </div>
+              <div class="detail-field">
+                <div class="detail-label">说明</div>
+                <div class="detail-value" style="color:var(--text-dim)">目标节点尚未生成，等待 Agent 执行中...</div>
+              </div>
+            </template>
+
+            <!-- Complete node -->
+            <template v-else-if="selected.type === 'complete'">
+              <div class="detail-title" style="color:var(--success)">探索完成</div>
+              <div class="detail-field" v-if="selected.summary">
+                <div class="detail-label">总结</div>
+                <div class="detail-value">{{ selected.summary }}</div>
+              </div>
+              <div class="detail-field" v-else>
+                <div class="detail-value" style="color:var(--text-dim)">所有探索任务已完成，未生成新的探索方向。</div>
+              </div>
+            </template>
+
+            <!-- Real node -->
+            <template v-else-if="selected.type === 'node'">
+              <div class="detail-title">节点 #{{ selected.nodeId }}</div>
+              <div class="detail-field">
+                <div class="detail-label">来源</div>
+                <div class="detail-value">{{ selected.createdBy }}</div>
+              </div>
+              <div class="detail-field">
+                <div class="detail-label">描述</div>
+                <div class="detail-value">{{ selected.description }}</div>
+              </div>
+            </template>
+
+            <!-- Edge -->
+            <template v-else-if="selected.type === 'edge'">
+              <div class="detail-title">探索方向 #{{ selected.edgeId }}</div>
+              <div class="detail-field">
+                <div class="detail-label">状态</div>
+                <div class="detail-value">
+                  <span v-if="selected.pending && selected.running" style="color:var(--primary)">执行中</span>
+                  <span v-else-if="selected.pending" style="color:var(--text-dim)">待执行</span>
+                  <span v-else-if="selected.isTerminal" style="color:var(--success)">完成</span>
+                  <span v-else>已完成</span>
+                </div>
+              </div>
+              <div v-if="selected.failureCount > 0" class="detail-field">
+                <div class="detail-label">失败次数</div>
+                <div class="detail-value" style="color:var(--danger)">{{ selected.failureCount }}</div>
+              </div>
+              <div class="detail-field">
+                <div class="detail-label">探索方向</div>
+                <div class="detail-value">{{ selected.description }}</div>
+              </div>
+            </template>
           </template>
           <div v-else class="detail-panel-empty">
             点击节点或边<br>查看详细信息
