@@ -9,7 +9,7 @@ export function renderActPrompt(
 ): string {
   const outputFile = `${workdir}/act_output.json`;
 
-  return `Write your results to ${outputFile}, then validate with \`validate-json act ${outputFile}\`. Fix and retry if it fails. Stop when it passes.
+  return `Use the write tool to save your results to ${outputFile} as a JSON object with a "description" field. Then run \`validate-json act ${outputFile}\`. Fix and retry if it fails. Stop when it passes.
 
 ## Exploration Direction
 ${directionDescription}
@@ -20,8 +20,6 @@ Use bash and other tools to execute this exploration. Save raw outputs to files 
 \`\`\`json
 ${JSON.stringify(snapshot, null, 2)}
 \`\`\`
-
-The output must be a JSON object with a single "description" field containing your findings.
 
 project_id: ${projectId}
 edge_id: ${edgeId}`;

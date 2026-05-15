@@ -2,7 +2,7 @@ import type { Snapshot } from '../types';
 
 export function renderPlanPrompt(snapshot: Snapshot, projectId: number, round: number): string {
   const file = `/home/kali/workspace/plan_output_${round}.json`;
-  return `Write your decision to ${file}, then validate it by running \`validate-json plan ${file}\`. If validation fails, fix and retry. Stop when it passes.
+  return `Use the write tool to save your decision to ${file}. Then run \`validate-json plan ${file}\`. Fix and retry if validation fails. Stop when it passes.
 
 You are a security testing planner. Analyze the current exploration graph and decide the next course of action. Do NOT execute exploration commands (nmap, curl, etc.) — only use tools to understand the state, then write your decision.
 

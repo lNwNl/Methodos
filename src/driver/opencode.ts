@@ -28,9 +28,13 @@ export class OpenCodeDriver implements AgentDriver {
   ) {}
 
   private async tryReadOutputFile(path: string): Promise<any | null> {
-    const content = await readFileFromContainer(this.projectId, path);
-    if (!content) return null;
-    return parseJson(content);
+    // Retry with delay: model may still be flushing file to disk
+    for (let i = 0; i < 6; i++) {
+      const content = await readFileFromContainer(this.projectId, path);
+      if (content) return parseJson(content);
+      if (i < 5) await new Promise(r => setTimeout(r, 2000));
+    }
+    return null;
   }
 
   private outputFileError(path: string): Error {
