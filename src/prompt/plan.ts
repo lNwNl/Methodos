@@ -2,17 +2,7 @@ import type { Snapshot } from '../types';
 
 export function renderPlanPrompt(snapshot: Snapshot, projectId: number, round: number): string {
   const file = `/home/kali/workspace/plan_output_${round}.json`;
-  return `Execute this bash command to write your plan, then self-validate:
-
-\`\`\`bash
-cat > ${file} << 'EOF'
-{... your plan JSON ...}
-EOF
-
-validate-json plan ${file}
-\`\`\`
-
-If you see "FAIL: ...", follow the specific instruction in the error message, fix the JSON, and rerun the cat command. Repeat until you see "OK". Then stop.
+  return `Write your decision to ${file}, then validate it by running \`validate-json plan ${file}\`. If validation fails, fix and retry. Stop when it passes.
 
 You are a security testing planner. Analyze the current exploration graph and decide the next course of action. Do NOT execute exploration commands (nmap, curl, etc.) — only use tools to understand the state, then write your decision.
 
@@ -44,7 +34,7 @@ When the goal is not yet achieved and new exploration directions are warranted.
   "edges": [
     {
       "from_node_ids": [1],
-      "direction_description": "Specific, actionable next step. E.g.: 'Use nmap to scan ports 1-1000 on target host'"
+      "direction_description": "Specific, actionable next step. E.g.: 'Scan target ports 1-65535 with nmap'"
     }
   ],
   "complete": false

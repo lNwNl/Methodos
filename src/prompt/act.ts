@@ -8,16 +8,8 @@ export function renderActPrompt(
   edgeId: number,
 ): string {
   const outputFile = `${workdir}/act_output.json`;
-  return `Your final step MUST be this bash command. Run it after you have gathered findings:
 
-\`\`\`bash
-cat > ${outputFile} << 'EOF'
-{"description": "your findings here"}
-EOF
-validate-json act ${outputFile}
-\`\`\`
-
-If validate-json reports "FAIL:", fix the JSON and rerun. When it says "OK", stop immediately.
+  return `Write your results to ${outputFile}, then validate with \`validate-json act ${outputFile}\`. Fix and retry if it fails. Stop when it passes.
 
 ## Exploration Direction
 ${directionDescription}
@@ -28,6 +20,8 @@ Use bash and other tools to execute this exploration. Save raw outputs to files 
 \`\`\`json
 ${JSON.stringify(snapshot, null, 2)}
 \`\`\`
+
+The output must be a JSON object with a single "description" field containing your findings.
 
 project_id: ${projectId}
 edge_id: ${edgeId}`;

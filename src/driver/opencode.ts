@@ -50,7 +50,7 @@ export class OpenCodeDriver implements AgentDriver {
 
     await execInContainer(this.projectId, [
       this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
-      `根据 plan_prompt.md 中的指令分析探索图。将结果写入 plan_output_${params.round}.json，然后停止。`,
+      `Follow plan_prompt.md to write and validate plan_output_${params.round}.json, then stop.`,
       '-f', promptPath,
     ], {
       workdir: params.workdir,
@@ -81,7 +81,7 @@ export class OpenCodeDriver implements AgentDriver {
 
     const result = await execInContainer(this.projectId, [
       this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
-      '根据 act_prompt.md 中的指令执行探索。将结果写入 act_output.json，然后停止。',
+      'Follow act_prompt.md to write and validate act_output.json, then stop.',
       '-f', promptPath,
     ], {
       workdir: params.workdir,
