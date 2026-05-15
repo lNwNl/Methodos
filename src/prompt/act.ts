@@ -9,7 +9,9 @@ export function renderActPrompt(
 ): string {
   const outputFile = `${workdir}/act_output.json`;
 
-  return `Use the write tool to save your results to ${outputFile} as a JSON object with a "description" field. Then run \`validate-json act ${outputFile}\`. Fix and retry if it fails. Stop when it passes.
+  return `You MUST write to ${outputFile} even if tools fail or return nothing. Use the write tool. Then run \`validate-json act ${outputFile}\`. Fix and retry if validation fails. Stop when it passes.
+
+If exploration tools fail or produce no results, still write the file with a description of what was attempted and why it failed.
 
 ## Exploration Direction
 ${directionDescription}
