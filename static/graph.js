@@ -264,7 +264,7 @@ createApp({
         const evidenceIds = (p.evidence_node_ids || []).filter(id => existingNodeIds.has(id));
         desired.set('complete_node', {
           group: 'nodes',
-          data: { id: 'complete_node', label: '✓ 探索完成', complete: true, summary: p.summary, evidenceIds },
+          data: { id: 'complete_node', label: '收束', complete: true, summary: p.summary, evidenceIds },
           classes: 'complete-node',
         });
         for (const nid of evidenceIds) {
@@ -309,14 +309,14 @@ createApp({
         container,
         elements,
         style: [
-          { selector: 'node', style: { 'label': 'data(label)', 'border-width': 1.5, 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
-          { selector: '.resulted', style: { 'label': 'data(label)', 'width': 1.5, 'line-color': s.resultedLine, 'target-arrow-color': s.resultedArrow, 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.resultedText, 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
-          { selector: '.pending', style: { 'label': 'data(label)', 'width': 1.2, 'line-color': s.pendingLine, 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.pendingText, 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
-          { selector: '.edge-running', style: { 'label': 'data(label)', 'width': 1.5, 'line-color': '#6366F1', 'line-style': 'dashed', 'target-arrow-color': '#6366F1', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#6366F1', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
+          { selector: 'node', style: { 'label': 'data(label)', 'border-width': 1.5, 'font-size': '13px', 'text-wrap': 'wrap', 'text-max-width': '200px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
+          { selector: '.resulted', style: { 'label': 'data(label)', 'width': 1.5, 'line-color': s.resultedLine, 'target-arrow-color': s.resultedArrow, 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '10px', 'color': s.resultedText, 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
+          { selector: '.pending', style: { 'label': 'data(label)', 'width': 1.2, 'line-color': s.pendingLine, 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '10px', 'color': s.pendingText, 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
+          { selector: '.edge-running', style: { 'label': 'data(label)', 'width': 1.5, 'line-color': '#6366F1', 'line-style': 'dashed', 'target-arrow-color': '#6366F1', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '10px', 'color': '#6366F1', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.conclusion', style: { 'width': 2.5, 'line-color': '#3C5DFF', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'straight', 'line-style': 'solid' } },
           { selector: '.ghost', style: { 'width': 8, 'height': 8, 'background-color': 'transparent', 'border-width': 1.5, 'border-color': s.ghostBorder, 'border-style': 'dashed', 'border-opacity': 0.35 } },
           { selector: '.ghost-running', style: { 'width': 9, 'height': 9, 'background-color': '#3C5DFF', 'background-opacity': 0.15, 'border-width': 1.5, 'border-color': '#3C5DFF', 'border-style': 'dashed', 'border-opacity': 0.5 } },
-          { selector: '.complete-node', style: { 'shape': 'round-rectangle', 'background-color': '#3C5DFF', 'border-width': 1.5, 'border-color': '#3C5DFF', 'font-size': '11px', 'font-weight': '600', 'color': '#FFFFFF', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'font-family': 'Inter, sans-serif' } },
+          { selector: '.complete-node', style: { 'shape': 'round-rectangle', 'background-color': '#3C5DFF', 'border-width': 1.5, 'border-color': '#3C5DFF', 'font-size': '13px', 'font-weight': '600', 'color': '#FFFFFF', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'font-family': 'Inter, sans-serif' } },
           { selector: '.evidence', style: { 'border-color': '#F59E0B', 'border-width': 2.5 } },
           { selector: '.dimmed', style: { 'opacity': 0.18 } },
           { selector: '.focus', style: { 'border-color': '#F59E0B', 'border-width': 2.5 } },
@@ -552,6 +552,20 @@ createApp({
       });
     }
 
+    function formatTime(iso) {
+      if (!iso) return '';
+      try {
+        const d = new Date(iso);
+        const pad = n => String(n).padStart(2, '0');
+        const mon = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hh = pad(d.getHours());
+        const mm = pad(d.getMinutes());
+        const ss = pad(d.getSeconds());
+        return mon + '-' + day + ' ' + hh + ':' + mm + ':' + ss;
+      } catch { return iso; }
+    }
+
     function buildLog() {
       const p = project.value;
       if (!p) return [];
@@ -561,6 +575,7 @@ createApp({
       for (const n of p.nodes) {
         const edge = n.edge_id ? edgeMap.get(n.edge_id) : null;
         const fromDesc = edge ? edge.title || trunc(edge.direction_description, 20) : '';
+        const isTimeout = n.created_by === 'system' && n.description && n.description.includes('超时');
         log.push({
           type: 'node',
           createdBy: n.created_by,
@@ -570,15 +585,19 @@ createApp({
           nodeId: n.id,
           edgeId: n.edge_id,
           fromDesc,
+          isTimeout,
         });
       }
       for (const e of p.edges) {
         let status = 'planned';
-        if (e.to_node_ids.length > 0) status = 'completed';
+        let outcome = '';
+        if (e.to_node_ids.length > 0) { status = 'completed'; outcome = 'success'; }
         else if (e.claimed_at) status = 'running';
+        if (e.failure_count > 0) outcome = 'failed';
         log.push({
           type: 'edge',
           status,
+          outcome,
           title: e.title || trunc(e.direction_description, 15),
           description: e.direction_description,
           time: e.created_at,
@@ -587,6 +606,15 @@ createApp({
         });
       }
       log.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+      if (p.status === 'completed') {
+        log.push({
+          type: 'complete',
+          summary: p.summary || '',
+          title: '收束',
+          time: p.updated_at || '',
+          evidenceNodeIds: p.evidence_node_ids || [],
+        });
+      }
       return log;
     }
 
@@ -594,7 +622,14 @@ createApp({
       const p = project.value;
       if (!p) return;
       panelTab.value = 'detail';
-      if (entry.type === 'node') {
+      if (entry.type === 'complete') {
+        const evIds = (p.evidence_node_ids || []).filter(id => (p.nodes || []).some(n => n.id === id));
+        selected.value = { type: 'complete', summary: p.summary, evidenceIds: evIds };
+        nextTick(() => {
+          const el = cy.getElementById('complete_node');
+          if (el.length) { clearHighlight(); highlightNode(el); }
+        });
+      } else if (entry.type === 'node') {
         const n = (p.nodes || []).find(nd => nd.id === entry.nodeId);
         if (n) {
           selected.value = { type: 'node', nodeId: n.id, createdBy: n.created_by, title: n.title, description: n.description, data: {} };
@@ -631,7 +666,7 @@ createApp({
 
     return {
       project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, panelTab, LAYOUT_NAMES, graphReady,
-      stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, evidenceNodesDesc, buildLog, selectLogEntry,
+      stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, formatTime, evidenceNodesDesc, buildLog, selectLogEntry,
       startPanelResize, setLayout, toggleTheme,
     };
   },
@@ -691,7 +726,7 @@ createApp({
             </template>
 
             <template v-else-if="selected.type === 'complete'">
-              <div class="detail-title" style="color:var(--primary)">✓ 探索完成</div>
+              <div class="detail-title" style="color:var(--primary)">收束</div>
               <div class="detail-field" v-if="selected.summary">
                 <div class="detail-label">总结</div>
                 <div class="detail-value">{{ selected.summary }}</div>
@@ -700,8 +735,8 @@ createApp({
                 <div class="detail-label">支撑节点</div>
                 <div class="detail-value">
                   <div v-for="ev in evidenceNodesDesc(selected.evidenceIds)" :key="ev.id" style="margin-bottom:3px;display:flex;align-items:center;gap:0.35rem">
-                    <span style="flex-shrink:0;font-size:0.65rem;font-weight:600;color:var(--primary);border:1px solid var(--primary);border-radius:3px;padding:0px 4px">#{{ ev.id }}</span>
-                    <span style="font-size:0.7rem;color:var(--text-dim)">{{ ev.desc }}</span>
+                    <span style="flex-shrink:0;font-size:0.7rem;font-weight:600;color:var(--primary);border:1px solid var(--primary);border-radius:3px;padding:0px 4px">#{{ ev.id }}</span>
+                    <span style="font-size:0.75rem;color:var(--text-dim)">{{ ev.desc }}</span>
                   </div>
                 </div>
               </div>
@@ -761,17 +796,19 @@ createApp({
           <template v-else>
           <div class="log-list" v-if="buildLog().length">
             <div v-for="entry in buildLog()" :key="entry.type + '_' + (entry.nodeId || entry.edgeId) + '_' + entry.time" class="log-entry" @click="selectLogEntry(entry)">
-              <div class="log-dot" :style="{ background: entry.type === 'node' ? (entry.createdBy === 'human' ? '#4F46E5' : entry.createdBy === 'agent' ? '#0D9488' : '#78716C') : entry.status === 'completed' ? 'var(--success)' : entry.status === 'running' ? 'var(--primary)' : 'var(--text-dim)' }"></div>
+              <div class="log-dot" :style="{ background: entry.type === 'complete' ? 'var(--primary)' : entry.type === 'node' ? (entry.isTimeout ? 'var(--danger)' : entry.createdBy === 'human' ? '#4F46E5' : entry.createdBy === 'agent' ? '#0D9488' : '#78716C') : entry.outcome === 'success' ? 'var(--success)' : entry.outcome === 'failed' ? 'var(--danger)' : entry.status === 'running' ? 'var(--primary)' : 'var(--text-dim)' }"></div>
               <div class="log-content">
                 <div class="log-header">
                   <span class="log-title">{{ entry.title }}</span>
-                  <span v-if="entry.type === 'node'" class="log-tag" :style="{ background: entry.createdBy === 'human' ? 'rgba(79,70,229,0.12)' : entry.createdBy === 'agent' ? 'rgba(13,148,136,0.12)' : 'rgba(120,113,108,0.12)', color: entry.createdBy === 'human' ? '#4F46E5' : entry.createdBy === 'agent' ? '#0D9488' : '#78716C' }">{{ entry.createdBy }}</span>
-                  <span v-else class="log-tag" :style="{ background: entry.status === 'completed' ? 'rgba(34,197,94,0.12)' : entry.status === 'running' ? 'rgba(60,93,255,0.12)' : 'rgba(148,163,184,0.12)', color: entry.status === 'completed' ? 'var(--success)' : entry.status === 'running' ? 'var(--primary)' : 'var(--text-dim)' }">{{ entry.status === 'completed' ? '完成' : entry.status === 'running' ? '执行中' : '新方向' }}</span>
+                  <span v-if="entry.type === 'complete'" class="log-tag" :style="{ background: 'rgba(60,93,255,0.12)', color: 'var(--primary)' }">结束</span>
+                  <span v-else-if="entry.type === 'node'" class="log-tag" :style="{ background: entry.isTimeout ? 'rgba(239,68,68,0.12)' : entry.createdBy === 'human' ? 'rgba(79,70,229,0.12)' : entry.createdBy === 'agent' ? 'rgba(13,148,136,0.12)' : 'rgba(120,113,108,0.12)', color: entry.isTimeout ? 'var(--danger)' : entry.createdBy === 'human' ? '#4F46E5' : entry.createdBy === 'agent' ? '#0D9488' : '#78716C' }">{{ entry.isTimeout ? '超时' : entry.createdBy }}</span>
+                  <span v-else class="log-tag" :style="{ background: entry.outcome === 'success' ? 'rgba(34,197,94,0.12)' : entry.outcome === 'failed' ? 'rgba(239,68,68,0.12)' : entry.status === 'running' ? 'rgba(60,93,255,0.12)' : 'rgba(148,163,184,0.12)', color: entry.outcome === 'success' ? 'var(--success)' : entry.outcome === 'failed' ? 'var(--danger)' : entry.status === 'running' ? 'var(--primary)' : 'var(--text-dim)' }">{{ entry.outcome === 'success' ? '成功' : entry.outcome === 'failed' ? '失败' : entry.status === 'running' ? '执行中' : '新方向' }}</span>
                 </div>
-                <div class="log-desc">{{ entry.type === 'node' ? entry.description : entry.description }}</div>
-                <div v-if="entry.fromDesc" class="log-desc" style="font-size:0.65rem;opacity:0.6">来自: {{ entry.fromDesc }}</div>
-                <div v-if="entry.failureCount > 0" class="log-desc" style="color:var(--danger);font-size:0.65rem">失败 {{ entry.failureCount }} 次</div>
-                <div class="log-time">{{ entry.time }}</div>
+                <div class="log-desc" v-if="entry.type === 'complete' && entry.summary">{{ entry.summary }}</div>
+                <div class="log-desc" v-else-if="entry.type !== 'complete'">{{ entry.description }}</div>
+                <div v-if="entry.fromDesc" class="log-desc" style="font-size:0.7rem;opacity:0.6">来自: {{ entry.fromDesc }}</div>
+                <div v-if="entry.failureCount > 0" class="log-desc" style="color:var(--danger);font-size:0.7rem">失败 {{ entry.failureCount }} 次</div>
+                <div class="log-time">{{ formatTime(entry.time) }}</div>
               </div>
             </div>
           </div>

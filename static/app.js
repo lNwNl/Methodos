@@ -166,7 +166,7 @@ createApp({
       <div v-for="p in projects" :key="p.id" class="card">
         <div class="flex items-center justify-between">
           <div class="flex-1 min-w-0">
-            <a :href="'/project.html?id=' + p.id" class="truncate" style="font-size:0.85rem;font-weight:500;color:var(--text-bright);text-decoration:none;display:block">
+            <a :href="'/project.html?id=' + p.id" class="truncate" style="font-size:0.92rem;font-weight:500;color:var(--text-bright);text-decoration:none;display:block">
               {{ p.title.length > 80 ? p.title.slice(0,80)+'...' : p.title }}
             </a>
             <div class="stats-row">
