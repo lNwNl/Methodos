@@ -3,15 +3,16 @@ FROM --platform=amd64 kalilinux/kali-rolling:latest
 # Layer 1: Kali metapackages — all CLI pentesting tools
 RUN apt update && \
     apt install -y \
-        kali-tools-top10 \
+        kali-tools-information-gathering \
+        kali-tools-vulnerability \
         kali-tools-web \
         kali-tools-exploitation \
-        kali-tools-networking \
-        kali-tools-passwords \
         kali-tools-post-exploitation \
-        kali-tools-vulnerability \
-        kali-tools-information-gathering \
-        kali-tools-sniffing-spoofing && \
+        kali-tools-passwords \
+        kali-tools-sniffing-spoofing \
+        kali-tools-reverse-engineering \
+        kali-tools-crypto-stego \
+        kali-tools-windows-resources && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
