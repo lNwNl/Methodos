@@ -41,7 +41,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
 # Python libraries via uv (replaces pip3 install --break-system-packages)
-RUN uv pip install --system pwntools
+RUN uv pip install --system --break-system-packages pwntools
 
 # Layer 5: sudo for root
 RUN echo 'root ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/nopasswd && \
