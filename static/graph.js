@@ -13,8 +13,12 @@ createApp({
     const selected = ref(null);
     const showPushModal = ref(false);
     const pushNodes = ref([{ description: '' }]);
+    const panelWidth = ref(Number(localStorage.getItem('methodos-panel-width') || 320));
     let cy = null;
     let timer = null;
+    let resizing = false;
+    let resizeStartX = 0;
+    let resizeStartW = 0;
 
     function statusInfo(p) {
       if (p.status === 'active' && !p.last_plan_at && p.edges.length === 0) {
@@ -50,18 +54,19 @@ createApp({
       const container = document.getElementById('graph');
       if (!container) return;
 
+      const hadIds = cy ? new Set(cy.elements().map(el => el.id())) : new Set();
+      if (cy) cy.destroy();
+
       const elements = [];
       const isCompleted = p.status === 'completed';
       const existingNodeIds = new Set(p.nodes.map(n => n.id));
 
-      // Real nodes
       for (const n of p.nodes) {
         elements.push({
           data: { id: `n${n.id}`, label: trunc(n.description, 55), description: n.description, createdBy: n.created_by, nodeId: n.id },
         });
       }
 
-      // Edges
       for (const e of p.edges) {
         const ok = e.to_node_ids.length > 0;
         const running = !ok && e.claimed_at !== null;
@@ -88,7 +93,6 @@ createApp({
         }
       }
 
-      // Synthetic COMPLETE node + conclusion edges from evidence nodes
       if (isCompleted) {
         const evidenceIds = (p.evidence_node_ids || []).filter(id => existingNodeIds.has(id));
 
@@ -105,26 +109,28 @@ createApp({
         }
       }
 
-      if (cy) cy.destroy();
+      const tbg = { 'text-background-color': '#1E2030', 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' };
 
       cy = cytoscape({
         container,
         elements,
         style: [
-          { selector: 'node', style: { 'label': 'data(label)', 'background-color': '#3A3E52', 'border-width': 1.5, 'border-color': '#2A2D3E', 'font-size': '10px', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'color': '#CBD5E1', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif' } },
+          { selector: 'node', style: { 'label': 'data(label)', 'background-color': '#3A3E52', 'border-width': 1.5, 'border-color': '#2A2D3E', 'font-size': '10px', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'color': '#CBD5E1', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
           { selector: 'node[createdBy="human"]',  style: { 'background-color': NODE_COLORS.human, 'border-color': '#3C5DFF' } },
           { selector: 'node[createdBy="agent"]',  style: { 'background-color': NODE_COLORS.agent, 'border-color': '#22C55E' } },
           { selector: 'node[createdBy="system"]', style: { 'background-color': NODE_COLORS.system, 'border-color': '#EF4444' } },
-          { selector: '.resulted', style: { 'width': 1.5, 'line-color': '#4A4E62', 'target-arrow-color': '#4A4E62', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif' } },
-          { selector: '.pending', style: { 'width': 1.2, 'line-color': '#3A3E52', 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'font-family': 'Inter, sans-serif' } },
-          { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#3C5DFF', 'line-style': 'dashed', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#3C5DFF', 'font-family': 'Inter, sans-serif' } },
+          { selector: '.resulted', style: { 'width': 1.5, 'line-color': '#4A4E62', 'target-arrow-color': '#4A4E62', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', ...tbg } },
+          { selector: '.pending', style: { 'width': 1.2, 'line-color': '#3A3E52', 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#64748B', 'font-family': 'Inter, sans-serif', ...tbg } },
+          { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#3C5DFF', 'line-style': 'dashed', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '8px', 'color': '#3C5DFF', 'font-family': 'Inter, sans-serif', ...tbg } },
           { selector: '.conclusion', style: { 'width': 2.5, 'line-color': '#3C5DFF', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'straight', 'line-style': 'solid' } },
           { selector: '.ghost', style: { 'width': 8, 'height': 8, 'background-color': 'transparent', 'border-width': 1.5, 'border-color': '#3A3E52', 'border-style': 'dashed', 'border-opacity': 0.35 } },
           { selector: '.ghost-running', style: { 'width': 9, 'height': 9, 'background-color': '#3C5DFF', 'background-opacity': 0.15, 'border-width': 1.5, 'border-color': '#3C5DFF', 'border-style': 'dashed', 'border-opacity': 0.5 } },
           { selector: '.complete-node', style: { 'shape': 'round-rectangle', 'background-color': '#3C5DFF', 'border-width': 1.5, 'border-color': '#3C5DFF', 'font-size': '10px', 'font-weight': '600', 'color': '#FFFFFF', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'font-family': 'Inter, sans-serif' } },
           { selector: '.evidence', style: { 'border-color': '#F59E0B', 'border-width': 2.5 } },
+          { selector: '.dimmed', style: { 'opacity': 0.18 } },
+          { selector: '.focus', style: { 'border-color': '#F59E0B', 'border-width': 2.5 } },
         ],
-        layout: { name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true },
+        layout: { name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true, fit: true, padding: 50 },
       });
 
       for (const id of (p.evidence_node_ids || [])) {
@@ -132,16 +138,28 @@ createApp({
         if (n.length) n.addClass('evidence');
       }
 
+      // Fade-in new elements from this poll cycle
+      setTimeout(() => {
+        const fresh = cy.elements().filter(el => !hadIds.has(el.id()));
+        if (fresh.length > 0 && fresh.length < cy.elements().length) {
+          fresh.style('opacity', 0);
+          fresh.animate({ style: { opacity: 1 } }, { duration: 350, easing: 'ease-in-out-cubic' });
+        }
+      }, 80);
+
       // Tap: node
       cy.on('tap', 'node', e => {
         const d = e.target.data();
         if (d.ghost) {
           const status = d.running ? '执行中' : '待执行';
           selected.value = { type: 'ghost', edgeId: d.edgeId, status };
+          highlightNode(e.target);
         } else if (d.complete) {
           selected.value = { type: 'complete', summary: d.summary, evidenceIds: d.evidenceIds || [] };
+          highlightNode(e.target);
         } else {
           selected.value = { type: 'node', nodeId: d.nodeId, createdBy: d.createdBy, description: d.description, data: d };
+          highlightNode(e.target);
         }
       });
 
@@ -155,7 +173,77 @@ createApp({
         } else if (d.edgeId) {
           selected.value = { type: 'edge', edgeId: d.edgeId, failureCount: d.failureCount, description: d.description, data: d };
         }
+        highlightEdge(e.target);
       });
+
+      // Tap: background — clear selection
+      cy.on('tap', e => {
+        if (e.target === cy) {
+          selected.value = null;
+          clearHighlight();
+        }
+      });
+    }
+
+    // ---- Highlight helpers ----
+
+    function highlightNode(node) {
+      if (!cy) return;
+      cy.elements().addClass('dimmed');
+      node.removeClass('dimmed').addClass('focus');
+      node.neighborhood().removeClass('dimmed');
+    }
+
+    function highlightEdge(edge) {
+      if (!cy) return;
+      cy.elements().addClass('dimmed');
+      edge.removeClass('dimmed');
+      edge.source().removeClass('dimmed').addClass('focus');
+      edge.target().removeClass('dimmed').addClass('focus');
+    }
+
+    function clearHighlight() {
+      if (!cy) return;
+      cy.elements().removeClass('dimmed').removeClass('focus');
+    }
+
+    // ---- Panel resize ----
+
+    function startPanelResize(e) {
+      resizing = true;
+      resizeStartX = e.clientX;
+      resizeStartW = panelWidth.value;
+      document.addEventListener('mousemove', onPanelResize);
+      document.addEventListener('mouseup', stopPanelResize);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    }
+
+    function onPanelResize(e) {
+      if (!resizing) return;
+      const dx = resizeStartX - e.clientX;
+      panelWidth.value = Math.max(240, Math.min(640, resizeStartW + dx));
+      localStorage.setItem('methodos-panel-width', panelWidth.value);
+      if (cy) { cy.resize(); setTimeout(() => cy.fit(undefined, 50), 50); }
+    }
+
+    function stopPanelResize() {
+      resizing = false;
+      document.removeEventListener('mousemove', onPanelResize);
+      document.removeEventListener('mouseup', stopPanelResize);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    // ---- Layout ----
+
+    function zoomIn()  { if (cy) { cy.zoom(cy.zoom() * 1.2); } }
+    function zoomOut() { if (cy) { cy.zoom(cy.zoom() / 1.2); } }
+    function zoomFit() { if (cy) { cy.fit(undefined, 50); } }
+
+    async function stopProject() {
+      try { await fetch(`/projects/${projectId}/stop`, { method: 'POST' }); fetchProject(); } catch {}
     }
 
     function trunc(s, max) {
@@ -172,14 +260,6 @@ createApp({
       });
     }
 
-    function zoomIn()  { if (cy) cy.zoom(cy.zoom() * 1.2); }
-    function zoomOut() { if (cy) cy.zoom(cy.zoom() / 1.2); }
-    function zoomFit() { if (cy) cy.fit(undefined, 50); }
-
-    async function stopProject() {
-      try { await fetch(`/projects/${projectId}/stop`, { method: 'POST' }); fetchProject(); } catch {}
-    }
-
     async function confirmPush() {
       const nodes = pushNodes.value.filter(n => n.description.trim()).map(n => ({ description: n.description.trim() }));
       try {
@@ -192,12 +272,19 @@ createApp({
 
     function addNode() { pushNodes.value.push({ description: '' }); }
 
-    onMounted(() => { fetchProject(); timer = setInterval(fetchProject, 2000); });
-    onBeforeUnmount(() => { clearInterval(timer); if (cy) cy.destroy(); });
+    onMounted(() => {
+      fetchProject();
+      timer = setInterval(fetchProject, 2000);
+    });
+    onBeforeUnmount(() => {
+      clearInterval(timer);
+      if (cy) cy.destroy();
+    });
 
     return {
-      project, loading, error, selected, showPushModal, pushNodes,
+      project, loading, error, selected, showPushModal, pushNodes, panelWidth,
       stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, evidenceNodesDesc,
+      startPanelResize, zoomFit,
     };
   },
 
@@ -213,22 +300,19 @@ createApp({
       </div>
     </div>
 
-    <!-- Loading -->
     <div v-if="loading" class="empty-state flex-1"><span class="spinner"></span> 加载中...</div>
 
-    <!-- Error -->
     <div v-else-if="error" class="empty-state flex-1" style="color:var(--danger)">{{ error }}</div>
 
-    <!-- Content -->
     <template v-else-if="project">
       <div v-if="project.status === 'completed' && project.summary" class="summary-bar">
         <span class="badge badge-completed" style="margin-right:0.5rem">完成</span>
         {{ project.summary }}
       </div>
 
-      <div class="flex gap-2 flex-1 min-h-0" style="flex:1;min-height:0">
+      <div class="flex flex-1 min-h-0" style="flex:1;min-height:0;gap:0">
         <!-- Graph -->
-        <div class="graph-container flex-1" style="flex:1;min-width:0">
+        <div class="graph-container flex-1" style="flex:1;min-width:0;border-right:none">
           <div class="graph-toolbar">
             <button class="btn" @click="zoomOut" title="缩小">−</button>
             <button class="btn" @click="zoomIn"  title="放大">+</button>
@@ -237,11 +321,13 @@ createApp({
           <div id="graph" class="w-full h-full"></div>
         </div>
 
+        <!-- Resize handle -->
+        <div class="panel-resize-handle" @mousedown="startPanelResize"></div>
+
         <!-- Side panel -->
-        <div class="detail-panel" style="width:320px">
+        <div class="detail-panel" :style="{ width: panelWidth + 'px', flexShrink: '0' }">
           <template v-if="selected">
 
-            <!-- Ghost placeholder -->
             <template v-if="selected.type === 'ghost'">
               <div class="detail-title">探索点 #{{ selected.edgeId }}</div>
               <div class="detail-field">
@@ -254,7 +340,6 @@ createApp({
               </div>
             </template>
 
-            <!-- Complete node -->
             <template v-else-if="selected.type === 'complete'">
               <div class="detail-title" style="color:var(--primary)">✓ 探索完成</div>
               <div class="detail-field" v-if="selected.summary">
@@ -275,7 +360,6 @@ createApp({
               </div>
             </template>
 
-            <!-- Real node -->
             <template v-else-if="selected.type === 'node'">
               <div class="detail-title">节点 #{{ selected.nodeId }}</div>
               <div class="detail-field">
@@ -288,7 +372,6 @@ createApp({
               </div>
             </template>
 
-            <!-- Conclusion edge -->
             <template v-else-if="selected.type === 'conclusion'">
               <div class="detail-title" style="color:var(--primary)">结论</div>
               <div class="detail-field">
@@ -300,7 +383,6 @@ createApp({
               </div>
             </template>
 
-            <!-- Edge -->
             <template v-else-if="selected.type === 'edge'">
               <div class="detail-title">探索方向 #{{ selected.edgeId }}</div>
               <div class="detail-field">

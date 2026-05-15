@@ -233,6 +233,21 @@ body {
 .detail-value { font-size: 0.75rem; color: var(--text); word-break: break-word; white-space: pre-wrap; }
 .detail-title { font-size: 0.8rem; font-weight: 600; color: var(--text-bright); margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
 
+/* Panel resize handle */
+.panel-resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 0.15s ease;
+  z-index: 5;
+}
+.panel-resize-handle:hover,
+.panel-resize-handle:active {
+  background: var(--primary);
+  opacity: 0.35;
+}
+
 /* Summary bar */
 .summary-bar {
   background: var(--bg-surface);
