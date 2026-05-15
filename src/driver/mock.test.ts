@@ -8,6 +8,7 @@ describe('MockAgentDriver', () => {
       prompt: 'project_id: 1\ntest',
       workdir: '/tmp',
       timeout: 1000,
+      round: 1,
     });
 
     expect(result.complete).toBe(false);
@@ -17,8 +18,8 @@ describe('MockAgentDriver', () => {
 
   it('returns complete on second plan', async () => {
     const driver = new MockAgentDriver();
-    await driver.executePlan({ prompt: 'project_id: 1\n', workdir: '/tmp', timeout: 1000 });
-    const result = await driver.executePlan({ prompt: 'project_id: 1\n', workdir: '/tmp', timeout: 1000 });
+    await driver.executePlan({ prompt: 'project_id: 1\n', workdir: '/tmp', timeout: 1000, round: 1 });
+    const result = await driver.executePlan({ prompt: 'project_id: 1\n', workdir: '/tmp', timeout: 1000, round: 1 });
 
     expect(result.complete).toBe(true);
     expect(result.edges).toHaveLength(0);
@@ -32,10 +33,10 @@ describe('MockAgentDriver', () => {
       { edges: [], complete: true, summary: 'done', evidence_node_ids: [2] },
     ]);
 
-    const r1 = await driver.executePlan({ prompt: 'project_id: 1\n', workdir: '/tmp', timeout: 1000 });
+    const r1 = await driver.executePlan({ prompt: 'project_id: 1\n', workdir: '/tmp', timeout: 1000, round: 1 });
     expect(r1.edges[0].direction_description).toBe('custom step');
 
-    const r2 = await driver.executePlan({ prompt: 'project_id: 1\n', workdir: '/tmp', timeout: 1000 });
+    const r2 = await driver.executePlan({ prompt: 'project_id: 1\n', workdir: '/tmp', timeout: 1000, round: 1 });
     expect(r2.complete).toBe(true);
     expect(r2.summary).toBe('done');
   });

@@ -9,6 +9,9 @@ RUN apt-get update && \
 
 RUN npm install -g opencode-ai@1.14.50
 
+COPY validate-json.js /usr/local/bin/validate-json
+RUN chmod +x /usr/local/bin/validate-json
+
 RUN mkdir -p /home/kali/workspace
 
 WORKDIR /home/kali/workspace

@@ -7,18 +7,26 @@ export function renderActPrompt(
   projectId: number,
   edgeId: number,
 ): string {
-  return `You are a security testing operator. Execute the assigned exploration direction to gather findings.
+  const outputFile = `${workdir}/act_output.json`;
+  return `Execute this bash command to write your results, then self-validate:
+
+\`\`\`bash
+cat > ${outputFile} << 'EOF'
+{... your result JSON ...}
+EOF
+
+validate-json act ${outputFile}
+\`\`\`
+
+If you see "FAIL: ...", follow the specific instruction in the error message, fix the JSON, and rerun the cat command. Repeat until you see "OK". Then stop.
+
+You are a security testing operator. Execute the assigned exploration direction to gather findings.
 
 ## Workflow
 1. Use tools (bash, web_fetch, etc.) to execute the exploration.
 2. Save raw tool outputs to files in the workspace directory.
-3. When you have findings — or cannot proceed further — write your final result by executing this command:
-   \`\`\`bash
-   cat > ${workdir}/act_output.json << 'EOF'
-   {"description":"your findings here, reference file paths"}
-   EOF
-   \`\`\`
-4. After executing the cat command above, stop immediately. Do NOT do anything else.
+3. Write your final result JSON using the cat command above, then validate it.
+4. When validation passes (OK), stop immediately.
 
 ## Exploration Direction
 ${directionDescription}
@@ -31,7 +39,7 @@ ${JSON.stringify(snapshot, null, 2)}
 ## Workspace
 ${workdir}
 
-## Output Format (write exactly this structure)
+## Output Format
 \`\`\`json
 {
   "description": "Only incremental findings discovered in this session. Reference file paths for raw data. Do not repeat information already in the graph."

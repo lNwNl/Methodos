@@ -258,6 +258,14 @@ export function updateProject(
   db.prepare(`UPDATE projects SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 }
 
+export function incrementPlanRound(db: Database.Database, projectId: number): number {
+  db.prepare(`
+    UPDATE projects SET plan_round = plan_round + 1 WHERE id = ?
+  `).run(projectId);
+  const row = db.prepare('SELECT plan_round FROM projects WHERE id = ?').get(projectId) as any;
+  return row.plan_round;
+}
+
 export function setProjectLastPlanAt(
   db: Database.Database,
   projectId: number,

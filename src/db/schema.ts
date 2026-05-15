@@ -7,6 +7,7 @@ export const projects = sqliteTable('projects', {
   agentType: text('agent_type').notNull(),
   imageTag: text('image_tag').notNull(),
   lastPlanAt: text('last_plan_at'),
+  planRound: integer('plan_round').notNull().default(0),
   failureCount: integer('failure_count').notNull().default(0),
   summary: text('summary'),
   evidenceNodeIds: text('evidence_node_ids', { mode: 'json' }).$type<number[]>(),

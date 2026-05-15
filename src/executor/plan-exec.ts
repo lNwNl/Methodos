@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { renderSnapshot } from '../snapshot/render';
 import { renderPlanPrompt } from '../prompt/plan';
 import { config } from '../config';
-import { getProject, hasUnresultedEdges, hasNewNodesSince, insertEdges, setProjectLastPlanAt, updateProject } from '../db/operations';
+import { getProject, hasUnresultedEdges, hasNewNodesSince, insertEdges, setProjectLastPlanAt, updateProject, incrementPlanRound } from '../db/operations';
 import type { AgentDriver, PlanOutput } from '../driver/types';
 import { z } from 'zod';
 
@@ -41,12 +41,14 @@ export function executePlan(
     snapshotMaxEdges: config.snapshotMaxEdges,
   });
 
-  const prompt = renderPlanPrompt(snapshot, projectId);
+  const round = incrementPlanRound(db, projectId);
+  const prompt = renderPlanPrompt(snapshot, projectId, round);
 
   return driver.executePlan({
     prompt,
     workdir: '/home/kali/workspace/',
     timeout: config.planTimeoutMs,
+    round,
   }).then((output) => {
     return writePlan(db, projectId, output, ts);
   }).catch((err) => {

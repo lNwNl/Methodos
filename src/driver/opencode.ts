@@ -41,9 +41,10 @@ export class OpenCodeDriver implements AgentDriver {
     prompt: string;
     workdir: string;
     timeout: number;
+    round: number;
   }): Promise<PlanOutput> {
     const promptPath = `${params.workdir}/plan_prompt.md`;
-    const outputPath = `${params.workdir}/plan_output.json`;
+    const outputPath = `${params.workdir}/plan_output_${params.round}.json`;
     await ensureWorkdir(this.projectId, params.workdir);
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 

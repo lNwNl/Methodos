@@ -13,6 +13,7 @@ function createTestDb() {
       agent_type TEXT NOT NULL,
       image_tag TEXT NOT NULL,
       last_plan_at TEXT,
+      plan_round INTEGER NOT NULL DEFAULT 0,
       failure_count INTEGER NOT NULL DEFAULT 0,
       summary TEXT,
       evidence_node_ids TEXT,

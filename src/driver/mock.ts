@@ -13,7 +13,7 @@ export class MockAgentDriver implements AgentDriver {
     this.planCounts.delete(projectId);
   }
 
-  async executePlan(params: { prompt: string; workdir: string; timeout: number }): Promise<PlanOutput> {
+  async executePlan(params: { prompt: string; workdir: string; timeout: number; round: number }): Promise<PlanOutput> {
     const projectId = this.extractProjectId(params.prompt);
     const count = (this.planCounts.get(projectId) || 0) + 1;
     this.planCounts.set(projectId, count);

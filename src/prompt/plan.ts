@@ -1,14 +1,20 @@
 import type { Snapshot } from '../types';
 
-export function renderPlanPrompt(snapshot: Snapshot, projectId: number): string {
-  return `Execute this bash command to write your decision, then stop:
+export function renderPlanPrompt(snapshot: Snapshot, projectId: number, round: number): string {
+  const file = `/home/kali/workspace/plan_output_${round}.json`;
+  return `Execute this bash command to write your plan, then self-validate:
+
 \`\`\`bash
-cat > /home/kali/workspace/plan_output.json << 'EOF'
-{... your decision JSON ...}
+cat > ${file} << 'EOF'
+{... your plan JSON ...}
 EOF
+
+validate-json plan ${file}
 \`\`\`
 
-${"You are a security testing planner. Analyze the current exploration graph and decide the next course of action. Do NOT execute exploration commands (nmap, curl, etc.) — only use tools to understand the state, then write your decision to plan_output.json."}
+If you see "FAIL: ...", follow the specific instruction in the error message, fix the JSON, and rerun the cat command. Repeat until you see "OK". Then stop.
+
+You are a security testing planner. Analyze the current exploration graph and decide the next course of action. Do NOT execute exploration commands (nmap, curl, etc.) — only use tools to understand the state, then write your decision.
 
 ## Current Exploration Graph
 \`\`\`json

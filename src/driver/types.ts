@@ -25,6 +25,7 @@ export interface AgentDriver {
     prompt: string;
     workdir: string;
     timeout: number;
+    round: number;
   }): Promise<PlanOutput>;
 
   executeAct(params: {
