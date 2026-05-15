@@ -212,6 +212,26 @@ body {
   font-size: 0.75rem;
   border-color: var(--border);
 }
+.layout-select {
+  background: rgba(30,32,48,0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.15rem 0.35rem;
+  font-family: var(--font);
+  font-size: 0.67rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='4'%3E%3Cpath d='M0 0l3.5 4L7 0z' fill='%2364748B'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.35rem center;
+  padding-right: 1.2rem;
+  transition: border-color 0.15s;
+}
+.layout-select:hover { border-color: var(--border-hover); color: var(--text-bright); }
 
 /* Detail panel */
 .detail-panel {

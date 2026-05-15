@@ -14,6 +14,7 @@ createApp({
     const showPushModal = ref(false);
     const pushNodes = ref([{ description: '' }]);
     const panelWidth = ref(Number(localStorage.getItem('methodos-panel-width') || 320));
+    const layoutKey = ref(localStorage.getItem('methodos-layout') || 'dagre_tb');
     let cy = null;
     let timer = null;
     let eventsReady = false;
@@ -29,6 +30,49 @@ createApp({
       'text-background-padding': '2px',
       'text-background-shape': 'round-rectangle',
     };
+
+    const LAYOUT_NAMES = {
+      dagre_tb: '从上到下',
+      dagre_lr: '从左到右',
+      breadthfirst: '广度优先',
+      concentric: '同心圆',
+      circle: '环形总览',
+      cose: '力导向',
+    };
+
+    function layoutOpts(key) {
+      const base = { fit: true, padding: 50 };
+      switch (key) {
+        case 'dagre_tb':
+          return { ...base, name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true };
+        case 'dagre_lr':
+          return { ...base, name: 'dagre', rankDir: 'LR', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true };
+        case 'breadthfirst':
+          return { ...base, name: 'breadthfirst', directed: true, spacingFactor: 1.4 };
+        case 'concentric':
+          return { ...base, name: 'concentric', concentric: (n) => n.degree(), minNodeSpacing: 50 };
+        case 'circle':
+          return { ...base, name: 'circle' };
+        case 'cose':
+          return { ...base, name: 'cose', idealEdgeLength: 120, nodeRepulsion: 8000, numIter: 2000, randomize: false, gravity: 0.25 };
+        default:
+          return { ...base, name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true };
+      }
+    }
+
+    function setLayout(key) {
+      if (!cy) return;
+      layoutKey.value = key;
+      localStorage.setItem('methodos-layout', key);
+      cy.layout(layoutOpts(key)).run();
+      setTimeout(() => { restoreDragged(); cy.fit(undefined, 50); }, 50);
+    }
+
+    function runLayout() {
+      if (!cy) return;
+      cy.layout(layoutOpts(layoutKey.value)).run();
+      setTimeout(() => restoreDragged(), 50);
+    }
 
     function statusInfo(p) {
       if (p.status === 'active' && !p.last_plan_at && p.edges.length === 0) {
@@ -163,7 +207,7 @@ createApp({
           { selector: '.dimmed', style: { 'opacity': 0.18 } },
           { selector: '.focus', style: { 'border-color': '#F59E0B', 'border-width': 2.5 } },
         ],
-        layout: { name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true, fit: true, padding: 50 },
+        layout: layoutOpts(layoutKey.value),
       });
 
       applyEvidence(p);
@@ -206,14 +250,7 @@ createApp({
       applyEvidence(p);
 
       if (newIds.size > 0) {
-        cy.layout({
-          name: 'dagre',
-          rankDir: 'TB',
-          spacingFactor: 1.4,
-          nodeDimensionsIncludeLabels: true,
-          fit: true,
-          padding: 50,
-        }).run();
+        cy.layout(layoutOpts(layoutKey.value)).run();
         restoreDragged();
         const fresh = cy.elements().filter(el => newIds.has(el.id()));
         if (fresh.length) {
@@ -390,9 +427,9 @@ createApp({
     });
 
     return {
-      project, loading, error, selected, showPushModal, pushNodes, panelWidth,
+      project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, LAYOUT_NAMES,
       stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, evidenceNodesDesc,
-      startPanelResize,
+      startPanelResize, setLayout,
     };
   },
 
@@ -422,6 +459,9 @@ createApp({
             <button class="btn" @click="zoomOut" title="缩小">−</button>
             <button class="btn" @click="zoomIn"  title="放大">+</button>
             <button class="btn" @click="zoomFit" title="适配屏幕">⊡</button>
+            <select class="layout-select" :value="layoutKey" @change="setLayout($event.target.value)">
+              <option v-for="(label, key) in LAYOUT_NAMES" :key="key" :value="key">{{ label }}</option>
+            </select>
           </div>
           <div id="graph" class="w-full h-full"></div>
         </div>
