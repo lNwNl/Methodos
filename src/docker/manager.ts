@@ -70,15 +70,8 @@ async function injectOpencodeConfig(containerName: string): Promise<void> {
     }
   }
 
-  // Add terminal MCP
+  // Add terminal MCP (no host plugins needed)
   merged.mcp.terminal = { type: 'local', command: ['uvx', 'terminal-mcp'] };
-
-  // Copy plugins from host, excluding superpowers
-  if (hostConfig.plugin) {
-    merged.plugin = hostConfig.plugin.filter(
-      (p: string) => !p.includes('superpowers')
-    );
-  }
 
   return new Promise<void>((resolve) => {
     const child = execFile(PODMAN, [
