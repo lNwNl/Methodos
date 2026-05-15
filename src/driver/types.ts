@@ -1,9 +1,11 @@
 export interface AgentOutput {
+  title?: string;
   description: string;
 }
 
 export interface PlanEdge {
   from_node_ids: number[];
+  title?: string;
   direction_description: string;
 }
 

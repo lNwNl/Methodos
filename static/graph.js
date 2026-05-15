@@ -1,7 +1,7 @@
 const params = new URLSearchParams(window.location.search);
 const projectId = params.get('id');
 
-const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#D97706' };
+const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
 
 const { createApp, ref, onMounted, onBeforeUnmount, nextTick } = Vue;
 
@@ -16,6 +16,7 @@ createApp({
     const panelWidth = ref(Number(localStorage.getItem('methodos-panel-width') || 320));
     const layoutKey = ref(localStorage.getItem('methodos-layout') || 'dagre_tb');
     const graphReady = ref(false);
+    let completedSelected = false;
     let cy = null;
 
     const CY_THEME = {
@@ -50,16 +51,31 @@ createApp({
       var bg, fg, bd, fw;
       if (createdBy === 'human')       { bg = '#4F46E5'; bd = '#3730A3'; fg = '#FFFFFF'; fw = '500'; }
       else if (createdBy === 'agent')  { bg = '#0D9488'; bd = '#0F766E'; fg = '#FFFFFF'; fw = '500'; }
-      else if (createdBy === 'system') { bg = '#D97706'; bd = '#B45309'; fg = '#FFFFFF'; fw = '500'; }
+      else if (createdBy === 'system') { bg = '#78716C'; bd = '#57534E'; fg = '#FFFFFF'; fw = '500'; }
       else                             { bg = s.nodeBg;  bd = s.nodeBorder; fg = s.nodeText; fw = '400'; }
       return { 'background-color': bg, 'border-color': bd, 'color': fg, 'font-weight': fw };
+    }
+
+    function startNodeStyle(theme) {
+      return { 'background-color': '#7C3AED', 'border-color': '#6D28D9', 'color': '#FFFFFF', 'font-weight': '600' };
+    }
+
+    function endNodeStyle(theme) {
+      return { 'background-color': '#047857', 'border-color': '#065F46', 'color': '#FFFFFF', 'font-weight': '600' };
     }
 
     function applyNodeInlineStyles(theme) {
       if (!cy) return;
       cy.nodes().forEach(function(node) {
-        var cb = node.data('createdBy');
-        if (cb) node.style(nodeInlineStyle(cb, theme));
+        if (node.data('ghost') || node.data('complete')) return;
+        if (node.data('isStart')) {
+          node.style(startNodeStyle(theme));
+        } else if (node.data('isEnd')) {
+          node.style(endNodeStyle(theme));
+        } else {
+          var cb = node.data('createdBy');
+          if (cb) node.style(nodeInlineStyle(cb, theme));
+        }
       });
     }
 
@@ -105,21 +121,22 @@ createApp({
 
     function layoutOpts(key) {
       const base = { fit: true, padding: 50 };
+      const edgeLen = 150;
       switch (key) {
         case 'dagre_tb':
-          return { ...base, name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true };
+          return { ...base, name: 'dagre', rankDir: 'TB', rankSep: edgeLen, nodeSep: 50, edgeSep: 20, nodeDimensionsIncludeLabels: true };
         case 'dagre_lr':
-          return { ...base, name: 'dagre', rankDir: 'LR', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true };
+          return { ...base, name: 'dagre', rankDir: 'LR', rankSep: edgeLen, nodeSep: 50, edgeSep: 20, nodeDimensionsIncludeLabels: true };
         case 'breadthfirst':
-          return { ...base, name: 'breadthfirst', directed: true, spacingFactor: 1.4 };
+          return { ...base, name: 'breadthfirst', directed: true, spacingFactor: 1.15, avoidOverlap: true };
         case 'concentric':
-          return { ...base, name: 'concentric', concentric: (n) => n.degree(), minNodeSpacing: 50 };
+          return { ...base, name: 'concentric', concentric: (n) => n.degree(), minNodeSpacing: 60, equidistant: true };
         case 'circle':
-          return { ...base, name: 'circle' };
+          return { ...base, name: 'circle', radius: edgeLen };
         case 'cose':
-          return { ...base, name: 'cose', idealEdgeLength: 200, nodeRepulsion: 400000, nodeOverlap: 50, componentSpacing: 100, numIter: 2500, randomize: false, gravity: 0.1 };
+          return { ...base, name: 'cose', idealEdgeLength: edgeLen, nodeRepulsion: 200000, nodeOverlap: 50, componentSpacing: 100, numIter: 2500, randomize: false, gravity: 0.1 };
         default:
-          return { ...base, name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true };
+          return { ...base, name: 'dagre', rankDir: 'TB', rankSep: edgeLen, nodeSep: 50, edgeSep: 20, nodeDimensionsIncludeLabels: true };
       }
     }
 
@@ -167,7 +184,8 @@ createApp({
         await nextTick();
         renderGraph();
         graphReady.value = true;
-        if (data.status === 'completed' && !selected.value) {
+        if (data.status === 'completed' && !selected.value && !completedSelected) {
+          completedSelected = true;
           const evIds = (data.evidence_node_ids || []).filter(id => data.nodes.some(n => n.id === id));
           selected.value = { type: 'complete', summary: data.summary, evidenceIds: evIds };
           if (cy) {
@@ -188,14 +206,24 @@ createApp({
       const existingNodeIds = new Set(p.nodes.map(n => n.id));
       const isCompleted = p.status === 'completed';
 
+      const sourceIds = new Set();
+      const targetIds = new Set();
+      for (const e of p.edges) {
+        for (const f of e.from_node_ids) sourceIds.add(f);
+        for (const t of e.to_node_ids) targetIds.add(t);
+      }
+
       for (const n of p.nodes) {
         var cls = '';
         if (n.created_by === 'human') cls = 'type-human';
         else if (n.created_by === 'agent') cls = 'type-agent';
         else if (n.created_by === 'system') cls = 'type-system';
+        const label = n.title || trunc(n.description, 10);
+        const isStart = !targetIds.has(n.id);
+        const isEnd = !sourceIds.has(n.id);
         desired.set(`n${n.id}`, {
           group: 'nodes',
-          data: { id: `n${n.id}`, label: trunc(n.description, 55), description: n.description, createdBy: n.created_by, nodeId: n.id },
+          data: { id: `n${n.id}`, label: label, title: n.title, description: n.description, createdBy: n.created_by, nodeId: n.id, isStart, isEnd },
           classes: cls,
         });
       }
@@ -207,14 +235,16 @@ createApp({
         for (const f of e.from_node_ids) {
           if (ok) {
             for (const t of e.to_node_ids) {
+              const edgeLabel = e.title || trunc(e.direction_description, 10);
               desired.set(`e${e.id}_${f}_${t}`, {
                 group: 'edges',
-                data: { id: `e${e.id}_${f}_${t}`, source: `n${f}`, target: `n${t}`, label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id, failureCount: e.failure_count },
+                data: { id: `e${e.id}_${f}_${t}`, source: `n${f}`, target: `n${t}`, label: edgeLabel, title: e.title, description: e.direction_description, edgeId: e.id, failureCount: e.failure_count },
                 classes: 'resulted',
               });
             }
           } else {
             const ghostId = `ghost_e${e.id}_${f}`;
+            const edgeLabel = e.title || trunc(e.direction_description, 10);
             desired.set(ghostId, {
               group: 'nodes',
               data: { id: ghostId, label: '', ghost: true, edgeId: e.id, running },
@@ -222,7 +252,7 @@ createApp({
             });
             desired.set(`e${e.id}_${f}_pending`, {
               group: 'edges',
-              data: { id: `e${e.id}_${f}_pending`, source: `n${f}`, target: ghostId, label: trunc(e.direction_description, 35), description: e.direction_description, edgeId: e.id, pending: true, running },
+              data: { id: `e${e.id}_${f}_pending`, source: `n${f}`, target: ghostId, label: edgeLabel, title: e.title, description: e.direction_description, edgeId: e.id, pending: true, running },
               classes: running ? 'edge-running' : 'pending',
             });
           }
@@ -279,9 +309,9 @@ createApp({
         elements,
         style: [
           { selector: 'node', style: { 'label': 'data(label)', 'border-width': 1.5, 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
-          { selector: '.resulted', style: { 'width': 1.5, 'line-color': s.resultedLine, 'target-arrow-color': s.resultedArrow, 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.resultedText, 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
-          { selector: '.pending', style: { 'width': 1.2, 'line-color': s.pendingLine, 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.pendingText, 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
-          { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#6366F1', 'line-style': 'dashed', 'target-arrow-color': '#6366F1', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#6366F1', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
+          { selector: '.resulted', style: { 'label': 'data(label)', 'width': 1.5, 'line-color': s.resultedLine, 'target-arrow-color': s.resultedArrow, 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.resultedText, 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
+          { selector: '.pending', style: { 'label': 'data(label)', 'width': 1.2, 'line-color': s.pendingLine, 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.pendingText, 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
+          { selector: '.edge-running', style: { 'label': 'data(label)', 'width': 1.5, 'line-color': '#6366F1', 'line-style': 'dashed', 'target-arrow-color': '#6366F1', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#6366F1', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.conclusion', style: { 'width': 2.5, 'line-color': '#3C5DFF', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'straight', 'line-style': 'solid' } },
           { selector: '.ghost', style: { 'width': 8, 'height': 8, 'background-color': 'transparent', 'border-width': 1.5, 'border-color': s.ghostBorder, 'border-style': 'dashed', 'border-opacity': 0.35 } },
           { selector: '.ghost-running', style: { 'width': 9, 'height': 9, 'background-color': '#3C5DFF', 'background-opacity': 0.15, 'border-width': 1.5, 'border-color': '#3C5DFF', 'border-style': 'dashed', 'border-opacity': 0.5 } },
@@ -312,8 +342,14 @@ createApp({
         if (!current.has(id)) {
           const added = cy.add({ group: spec.group, data: spec.data, classes: spec.classes || '' });
           newIds.add(id);
-          if (spec.group === 'nodes' && spec.data.createdBy) {
-            added.style(nodeInlineStyle(spec.data.createdBy, currentTheme()));
+          if (spec.group === 'nodes' && !spec.data.ghost && !spec.data.complete) {
+            if (spec.data.isStart) {
+              added.style(startNodeStyle(currentTheme()));
+            } else if (spec.data.isEnd) {
+              added.style(endNodeStyle(currentTheme()));
+            } else if (spec.data.createdBy) {
+              added.style(nodeInlineStyle(spec.data.createdBy, currentTheme()));
+            }
           }
         } else {
           const el = cy.getElementById(id);
@@ -332,8 +368,14 @@ createApp({
 
           if (spec.data) {
             el.data(spec.data);
-            if (el.isNode() && el.data('createdBy')) {
-              el.style(nodeInlineStyle(el.data('createdBy'), currentTheme()));
+            if (el.isNode() && !el.data('ghost') && !el.data('complete')) {
+              if (el.data('isStart')) {
+                el.style(startNodeStyle(currentTheme()));
+              } else if (el.data('isEnd')) {
+                el.style(endNodeStyle(currentTheme()));
+              } else if (el.data('createdBy')) {
+                el.style(nodeInlineStyle(el.data('createdBy'), currentTheme()));
+              }
             }
           }
         }
@@ -381,7 +423,7 @@ createApp({
           selected.value = { type: 'complete', summary: d.summary, evidenceIds: d.evidenceIds || [] };
           highlightNode(e.target);
         } else {
-          selected.value = { type: 'node', nodeId: d.nodeId, createdBy: d.createdBy, description: d.description, data: d };
+          selected.value = { type: 'node', nodeId: d.nodeId, createdBy: d.createdBy, title: d.title, description: d.description, data: d };
           highlightNode(e.target);
         }
       });
@@ -391,9 +433,9 @@ createApp({
         if (d.conclusion) {
           selected.value = { type: 'conclusion', source: d.source };
         } else if (d.pending || d.running) {
-          selected.value = { type: 'edge', edgeId: d.edgeId, pending: true, running: d.running, description: d.description, data: d };
+          selected.value = { type: 'edge', edgeId: d.edgeId, pending: true, running: d.running, title: d.title, description: d.description, data: d };
         } else if (d.edgeId) {
-          selected.value = { type: 'edge', edgeId: d.edgeId, failureCount: d.failureCount, description: d.description, data: d };
+          selected.value = { type: 'edge', edgeId: d.edgeId, failureCount: d.failureCount, title: d.title, description: d.description, data: d };
         }
         highlightEdge(e.target);
       });
@@ -594,7 +636,7 @@ createApp({
             </template>
 
             <template v-else-if="selected.type === 'node'">
-              <div class="detail-title">节点 #{{ selected.nodeId }}</div>
+              <div class="detail-title">{{ selected.title || '节点 #' + selected.nodeId }}</div>
               <div class="detail-field">
                 <div class="detail-label">来源</div>
                 <div class="detail-value">{{ selected.createdBy }}</div>
@@ -617,7 +659,7 @@ createApp({
             </template>
 
             <template v-else-if="selected.type === 'edge'">
-              <div class="detail-title">探索方向 #{{ selected.edgeId }}</div>
+              <div class="detail-title">{{ selected.title || '探索方向 #' + selected.edgeId }}</div>
               <div class="detail-field">
                 <div class="detail-label">状态</div>
                 <div class="detail-value">
@@ -631,7 +673,7 @@ createApp({
                 <div class="detail-value" style="color:var(--danger)">{{ selected.failureCount }}</div>
               </div>
               <div class="detail-field">
-                <div class="detail-label">探索方向</div>
+                <div class="detail-label">描述</div>
                 <div class="detail-value">{{ selected.description }}</div>
               </div>
             </template>

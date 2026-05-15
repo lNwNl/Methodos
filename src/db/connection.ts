@@ -48,6 +48,7 @@ export function initDb() {
     CREATE TABLE IF NOT EXISTS nodes (
       project_id INTEGER NOT NULL,
       id INTEGER NOT NULL,
+      title TEXT,
       description TEXT NOT NULL,
       created_by TEXT NOT NULL,
       edge_id INTEGER,
@@ -61,6 +62,7 @@ export function initDb() {
       from_node_ids TEXT NOT NULL DEFAULT '[]',
       to_node_ids TEXT NOT NULL DEFAULT '[]',
       claimed_at TEXT,
+      title TEXT,
       direction_description TEXT NOT NULL,
       failure_count INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,

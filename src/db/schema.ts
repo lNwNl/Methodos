@@ -18,6 +18,7 @@ export const projects = sqliteTable('projects', {
 export const nodes = sqliteTable('nodes', {
   projectId: integer('project_id').notNull(),
   id: integer('id').notNull(),
+  title: text('title'),
   description: text('description').notNull(),
   createdBy: text('created_by').notNull(),
   edgeId: integer('edge_id'),
@@ -32,6 +33,7 @@ export const edges = sqliteTable('edges', {
   fromNodeIds: text('from_node_ids', { mode: 'json' }).$type<number[]>().notNull(),
   toNodeIds: text('to_node_ids', { mode: 'json' }).$type<number[]>().notNull().default([]),
   claimedAt: text('claimed_at'),
+  title: text('title'),
   directionDescription: text('direction_description').notNull(),
   failureCount: integer('failure_count').notNull().default(0),
   createdAt: text('created_at').notNull(),

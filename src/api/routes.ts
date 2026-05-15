@@ -92,7 +92,7 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
       if (parsed.success) {
         const ts = new Date().toISOString();
         for (const node of parsed.data.nodes) {
-          insertNode(db, id, node.description, 'human', null, ts);
+          insertNode(db, id, null, node.description, 'human', null, ts);
         }
       }
       return reply.header('HX-Trigger', 'projectPushed').send({ status: 'active', message: 'Nodes added, current batch continues' });
@@ -104,7 +104,7 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
 
     if (parsed.success && parsed.data.nodes.length > 0) {
       for (const node of parsed.data.nodes) {
-        insertNode(db, id, node.description, 'human', null, ts);
+        insertNode(db, id, null, node.description, 'human', null, ts);
       }
     }
 

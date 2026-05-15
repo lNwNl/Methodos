@@ -28,7 +28,10 @@ ${JSON.stringify(snapshot, null, 2)}
 ## Output Format
 \`\`\`json
 {
+  "title": "简短标题（≤10字）",
   "description": "Factual summary of findings from this session. Include any file paths for raw data."
 }
-\`\`\``;
+\`\`\`
+
+All text fields (title and description) must be in Chinese (中文). The "title" must be no more than 10 characters.`;
 }

@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 const planEdgeSchema = z.object({
   from_node_ids: z.array(z.number()).default([]),
+  title: z.string().optional(),
   direction_description: z.string(),
 });
 
@@ -101,6 +102,7 @@ function writePlan(
     if (plan.edges.length > 0) {
       insertEdges(db, projectId, plan.edges.map(e => ({
         from_node_ids: e.from_node_ids,
+        title: e.title,
         direction_description: e.direction_description,
       })), ts);
     }

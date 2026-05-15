@@ -7,17 +7,18 @@ export function renderSnapshot(
   limits: { snapshotMaxNodes: number; snapshotMaxEdges: number },
 ): Snapshot {
   const nodes = db.prepare(
-    'SELECT id, description, created_by FROM nodes WHERE project_id = ? ORDER BY created_at ASC'
+    'SELECT id, title, description, created_by FROM nodes WHERE project_id = ? ORDER BY created_at ASC'
   ).all(projectId) as SnapshotNode[];
 
   const rawEdges = db.prepare(
-    'SELECT id, from_node_ids, to_node_ids, direction_description, failure_count FROM edges WHERE project_id = ? ORDER BY created_at ASC'
+    'SELECT id, from_node_ids, to_node_ids, title, direction_description, failure_count FROM edges WHERE project_id = ? ORDER BY created_at ASC'
   ).all(projectId) as any[];
 
   const edges: SnapshotEdge[] = rawEdges.map(e => ({
     id: e.id,
     from_node_ids: JSON.parse(e.from_node_ids),
     to_node_ids: JSON.parse(e.to_node_ids),
+    title: e.title || null,
     direction_description: e.direction_description,
     failure_count: e.failure_count,
   }));

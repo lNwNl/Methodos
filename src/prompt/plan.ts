@@ -6,6 +6,8 @@ export function renderPlanPrompt(snapshot: Snapshot, projectId: number, round: n
 
 You are a security testing planner. Analyze the current exploration graph and decide the next course of action. Do NOT execute exploration commands (nmap, curl, etc.) — only use tools to understand the state, then write your decision.
 
+All text fields (title, summary, direction_description) must be in Chinese (中文).
+
 ## Current Exploration Graph
 \`\`\`json
 ${JSON.stringify(snapshot, null, 2)}
@@ -46,7 +48,8 @@ When the goal is not yet achieved and new exploration directions are warranted.
   "edges": [
     {
       "from_node_ids": [1],
-      "direction_description": "Specific, actionable next step. E.g.: 'Scan target ports 1-65535 with nmap'"
+      "title": "简短标题（≤10字）",
+      "direction_description": "Specific, actionable next step. E.g.: '使用nmap扫描目标端口1-65535'"
     }
   ],
   "complete": false
@@ -64,9 +67,11 @@ Only when you CANNOT explore further due to fundamental blockers (all tools fail
 \`\`\`
 
 ## Rules
+- Each edge's "title" must be a short summary in Chinese (中文), no more than 10 characters.
+- Each edge's "direction_description" must also be in Chinese (中文), and be specific and actionable — a single concrete step.
+- Every output field must be in Chinese (中文).
 - Different edges should cover DIFFERENT exploration dimensions. Avoid duplication or heavy overlap.
 - Each edge's from_node_ids must reference existing Node IDs from the graph.
-- Each direction_description must be specific and actionable — a single concrete step, not a vague category.
 - If exhaustive exploration produces a conclusive answer (even a negative one), use outcome 2. Do NOT use outcome 4.
 - Propose at most 3 edges per round — focus on the most promising directions.
 

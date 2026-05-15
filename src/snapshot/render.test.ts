@@ -23,6 +23,7 @@ function createTestDb() {
     CREATE TABLE nodes (
       project_id INTEGER NOT NULL,
       id INTEGER NOT NULL,
+      title TEXT,
       description TEXT NOT NULL,
       created_by TEXT NOT NULL,
       edge_id INTEGER,
@@ -35,6 +36,7 @@ function createTestDb() {
       from_node_ids TEXT NOT NULL DEFAULT '[]',
       to_node_ids TEXT NOT NULL DEFAULT '[]',
       claimed_at TEXT,
+      title TEXT,
       direction_description TEXT NOT NULL,
       failure_count INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
@@ -65,7 +67,7 @@ describe('renderSnapshot', () => {
 
   it('includes edges and their nodes', () => {
     insertEdges(db, projectId, [{ from_node_ids: [1], direction_description: 'scan' }], now);
-    writeActResult(db, projectId, 1, 'Port 80 open', 'agent', '2026-05-14T00:01:00.000Z');
+    writeActResult(db, projectId, 1, null, 'Port 80 open', 'agent', '2026-05-14T00:01:00.000Z');
 
     const snap = renderSnapshot(db, projectId, { snapshotMaxNodes: 100, snapshotMaxEdges: 200 });
     expect(snap.nodes).toHaveLength(2);
@@ -81,7 +83,7 @@ describe('renderSnapshot', () => {
 
     for (let i = 0; i < 10; i++) {
       insertEdges(db, projectId, [{ from_node_ids: [i + 1], direction_description: `step ${i}` }], times[i]);
-      writeActResult(db, projectId, i + 1, `result ${i}`, 'agent', times[i]);
+      writeActResult(db, projectId, i + 1, null, `result ${i}`, 'agent', times[i]);
     }
 
     // Add an unresulted edge

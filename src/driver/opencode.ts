@@ -104,7 +104,7 @@ export class OpenCodeDriver implements AgentDriver {
     }
 
     return {
-      output: { description: output.description || JSON.stringify(output) },
+      output: { title: output.title, description: output.description || JSON.stringify(output) },
       sessionId,
       timedOut: result.exitCode === 124 || result.exitCode === -1,
     };
@@ -137,6 +137,6 @@ export class OpenCodeDriver implements AgentDriver {
     const output = await this.tryReadOutputFile(outputPath);
     if (!output) throw this.outputFileError(outputPath);
 
-    return { description: output.description || JSON.stringify(output) };
+    return { title: output.title, description: output.description || JSON.stringify(output) };
   }
 }

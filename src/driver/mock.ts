@@ -26,8 +26,8 @@ export class MockAgentDriver implements AgentDriver {
     if (count === 1) {
       return {
         edges: [
-          { from_node_ids: [1], direction_description: '扫描目标开放端口和服务' },
-          { from_node_ids: [1], direction_description: '枚举子域名和虚拟主机' },
+          { from_node_ids: [1], title: '端口扫描', direction_description: '扫描目标开放端口和服务' },
+          { from_node_ids: [1], title: '子域名枚举', direction_description: '枚举子域名和虚拟主机' },
         ],
         complete: false,
       };
@@ -47,7 +47,8 @@ export class MockAgentDriver implements AgentDriver {
 
     return {
       output: {
-        description: `探索结果 [Edge ${edgeId}]: 发现开放端口和服务信息`,
+        title: '端口开放',
+        description: `探索结果 [边 ${edgeId}]: 发现开放端口和服务信息`,
       },
       sessionId,
     };
@@ -55,6 +56,7 @@ export class MockAgentDriver implements AgentDriver {
 
   async conclude(params: { sessionId: string; prompt: string; workdir: string; timeout: number }): Promise<AgentOutput> {
     return {
+      title: '超时总结',
       description: '超时前部分结果：收集到部分信息',
     };
   }

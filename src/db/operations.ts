@@ -19,8 +19,8 @@ export function createProject(
   const projectId = result.lastInsertRowid as number;
 
   db.prepare(`
-    INSERT INTO nodes (project_id, id, description, created_by, edge_id, created_at)
-    VALUES (?, 1, ?, 'human', NULL, ?)
+    INSERT INTO nodes (project_id, id, title, description, created_by, edge_id, created_at)
+    VALUES (?, 1, NULL, ?, 'human', NULL, ?)
   `).run(projectId, title, ts);
 
   return projectId;
@@ -51,6 +51,7 @@ export function nextEdgeId(db: Database.Database, projectId: number): number {
 export function insertNode(
   db: Database.Database,
   projectId: number,
+  title: string | null,
   description: string,
   createdBy: string,
   edgeId: number | null,
@@ -58,25 +59,25 @@ export function insertNode(
 ): number {
   const id = nextNodeId(db, projectId);
   db.prepare(`
-    INSERT INTO nodes (project_id, id, description, created_by, edge_id, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(projectId, id, description, createdBy, edgeId, ts);
+    INSERT INTO nodes (project_id, id, title, description, created_by, edge_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(projectId, id, title, description, createdBy, edgeId, ts);
   return id;
 }
 
 export function insertEdges(
   db: Database.Database,
   projectId: number,
-  edges: { from_node_ids: number[]; direction_description: string }[],
+  edges: { from_node_ids: number[]; title?: string; direction_description: string }[],
   ts: string,
 ): number[] {
   const ids: number[] = [];
   for (const edge of edges) {
     const id = nextEdgeId(db, projectId);
     db.prepare(`
-      INSERT INTO edges (project_id, id, from_node_ids, to_node_ids, direction_description, created_at)
-      VALUES (?, ?, ?, '[]', ?, ?)
-    `).run(projectId, id, JSON.stringify(edge.from_node_ids), edge.direction_description, ts);
+      INSERT INTO edges (project_id, id, from_node_ids, to_node_ids, title, direction_description, created_at)
+      VALUES (?, ?, ?, '[]', ?, ?, ?)
+    `).run(projectId, id, JSON.stringify(edge.from_node_ids), edge.title || null, edge.direction_description, ts);
     ids.push(id);
   }
   return ids;
@@ -109,6 +110,7 @@ export function claimEdge(
     from_node_ids: JSON.parse(row.from_node_ids),
     to_node_ids: JSON.parse(row.to_node_ids),
     claimed_at: row.claimed_at,
+    title: row.title,
     direction_description: row.direction_description,
     failure_count: row.failure_count,
     created_at: row.created_at,
@@ -119,6 +121,7 @@ export function writeActResult(
   db: Database.Database,
   projectId: number,
   edgeId: number,
+  title: string | null,
   description: string,
   createdBy: string,
   ts: string,
@@ -127,9 +130,9 @@ export function writeActResult(
 
   const txn = db.transaction(() => {
     db.prepare(`
-      INSERT INTO nodes (project_id, id, description, created_by, edge_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(projectId, nodeId, description, createdBy, edgeId, ts);
+      INSERT INTO nodes (project_id, id, title, description, created_by, edge_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(projectId, nodeId, title, description, createdBy, edgeId, ts);
 
     db.prepare(`
       UPDATE edges SET to_node_ids = json_array(?)
@@ -159,12 +162,13 @@ export function handleActFailure(
     ).get(projectId, edgeId) as { failure_count: number };
 
     if (edge.failure_count >= maxFailures) {
+      const title = `超时 ${edge.failure_count} 次`;
       const description = `运行超时 ${edge.failure_count} 次`;
       const nodeId = nextNodeId(db, projectId);
       db.prepare(`
-        INSERT INTO nodes (project_id, id, description, created_by, edge_id, created_at)
-        VALUES (?, ?, ?, 'system', ?, ?)
-      `).run(projectId, nodeId, description, edgeId, ts);
+        INSERT INTO nodes (project_id, id, title, description, created_by, edge_id, created_at)
+        VALUES (?, ?, ?, ?, 'system', ?, ?)
+      `).run(projectId, nodeId, title, description, edgeId, ts);
       db.prepare(`
         UPDATE edges SET to_node_ids = json_array(?)
         WHERE project_id = ? AND id = ? AND to_node_ids = '[]'
@@ -201,11 +205,11 @@ export function countActiveActs(db: Database.Database, projectId: number): numbe
 
 export function getSnapshotData(db: Database.Database, projectId: number) {
   const nodes = db.prepare(
-    'SELECT id, description, created_by, edge_id, created_at FROM nodes WHERE project_id = ? ORDER BY created_at ASC'
+    'SELECT id, title, description, created_by, edge_id, created_at FROM nodes WHERE project_id = ? ORDER BY created_at ASC'
   ).all(projectId) as any[];
 
   const edges = db.prepare(
-    'SELECT id, from_node_ids, to_node_ids, claimed_at, direction_description, failure_count, created_at FROM edges WHERE project_id = ? ORDER BY created_at ASC'
+    'SELECT id, from_node_ids, to_node_ids, claimed_at, title, direction_description, failure_count, created_at FROM edges WHERE project_id = ? ORDER BY created_at ASC'
   ).all(projectId) as any[];
 
   return {
@@ -308,11 +312,11 @@ export function getProjectDetail(db: Database.Database, projectId: number) {
   if (!project) return null;
 
   const nodes = db.prepare(
-    'SELECT id, description, created_by, edge_id, created_at FROM nodes WHERE project_id = ? ORDER BY id ASC'
+    'SELECT id, title, description, created_by, edge_id, created_at FROM nodes WHERE project_id = ? ORDER BY id ASC'
   ).all(projectId) as any[];
 
   const edges = db.prepare(
-    'SELECT id, from_node_ids, to_node_ids, direction_description, failure_count, claimed_at, created_at FROM edges WHERE project_id = ? ORDER BY id ASC'
+    'SELECT id, from_node_ids, to_node_ids, title, direction_description, failure_count, claimed_at, created_at FROM edges WHERE project_id = ? ORDER BY id ASC'
   ).all(projectId) as any[];
 
   return {
@@ -329,7 +333,7 @@ export function getProjectDetail(db: Database.Database, projectId: number) {
 
 export function getEdgeStatuses(db: Database.Database, projectId: number) {
   const edges = db.prepare(
-    'SELECT id, from_node_ids, to_node_ids, direction_description, failure_count, claimed_at, created_at FROM edges WHERE project_id = ? ORDER BY id ASC'
+    'SELECT id, from_node_ids, to_node_ids, title, direction_description, failure_count, claimed_at, created_at FROM edges WHERE project_id = ? ORDER BY id ASC'
   ).all(projectId) as any[];
 
   return edges.map((e: any) => {

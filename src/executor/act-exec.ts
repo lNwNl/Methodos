@@ -8,6 +8,7 @@ import type { AgentDriver } from '../driver/types';
 import { z } from 'zod';
 
 const agentOutputSchema = z.object({
+  title: z.string().optional(),
   description: z.string(),
 });
 
@@ -63,7 +64,7 @@ export function executeAct(
     }
 
     try {
-      writeActResult(db, projectId, edge.id, parsed.data.description, 'agent', ts);
+      writeActResult(db, projectId, edge.id, parsed.data.title || null, parsed.data.description, 'agent', ts);
       return { success: true, edgeId: edge.id };
     } catch (err: any) {
       return { success: false, edgeId: edge.id, error: err.message };

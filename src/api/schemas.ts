@@ -26,6 +26,7 @@ export const projectListItemSchema = z.object({
 
 export const nodeSchema = z.object({
   id: z.number(),
+  title: z.string().nullable(),
   description: z.string(),
   created_by: z.string(),
   edge_id: z.number().nullable(),
@@ -36,6 +37,7 @@ export const edgeSchema = z.object({
   id: z.number(),
   from_node_ids: z.array(z.number()),
   to_node_ids: z.array(z.number()),
+  title: z.string().nullable(),
   direction_description: z.string(),
   failure_count: z.number(),
   claimed_at: z.string().nullable(),
@@ -62,6 +64,7 @@ export const edgeStatusSchema = z.object({
   id: z.number(),
   from_node_ids: z.array(z.number()),
   to_node_ids: z.array(z.number()),
+  title: z.string().nullable(),
   direction_description: z.string(),
   failure_count: z.number(),
   claimed_at: z.string().nullable(),

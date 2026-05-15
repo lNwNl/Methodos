@@ -37,6 +37,7 @@ function createTestDb() {
     CREATE TABLE nodes (
       project_id INTEGER NOT NULL,
       id INTEGER NOT NULL,
+      title TEXT,
       description TEXT NOT NULL,
       created_by TEXT NOT NULL,
       edge_id INTEGER,
@@ -49,6 +50,7 @@ function createTestDb() {
       from_node_ids TEXT NOT NULL DEFAULT '[]',
       to_node_ids TEXT NOT NULL DEFAULT '[]',
       claimed_at TEXT,
+      title TEXT,
       direction_description TEXT NOT NULL,
       failure_count INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
@@ -110,7 +112,7 @@ describe('operations', () => {
       { from_node_ids: [1], direction_description: 'scan' },
     ], now);
 
-    writeActResult(db, projectId, 1, 'Found port 80 open', 'agent', now);
+    writeActResult(db, projectId, 1, null, 'Found port 80 open', 'agent', now);
 
     const nodes = db.prepare(
       'SELECT * FROM nodes WHERE project_id = ? AND created_by = ?'
@@ -163,7 +165,7 @@ describe('operations', () => {
     ], now);
     expect(hasUnresultedEdges(db, projectId)).toBe(true);
 
-    writeActResult(db, projectId, 1, 'result', 'agent', now);
+    writeActResult(db, projectId, 1, null, 'result', 'agent', now);
     expect(hasUnresultedEdges(db, projectId)).toBe(false);
   });
 
@@ -175,7 +177,7 @@ describe('operations', () => {
 
     expect(hasNewNodesSince(db, projectId, t1)).toBe(false);
 
-    insertNode(db, projectId, 'new finding', 'agent', null, t2);
+    insertNode(db, projectId, null, 'new finding', 'agent', null, t2);
     expect(hasNewNodesSince(db, projectId, t1)).toBe(true);
   });
 });
