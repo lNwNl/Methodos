@@ -54,6 +54,24 @@ createApp({
           'border-color': s.nodeBorder,
           'color': s.nodeText,
         })
+        .selector('node[createdBy="human"]').style({
+          'background-color': NODE_COLORS.human,
+          'border-color': '#3730A3',
+          'color': '#FFFFFF',
+          'font-weight': '500',
+        })
+        .selector('node[createdBy="agent"]').style({
+          'background-color': NODE_COLORS.agent,
+          'border-color': '#0F766E',
+          'color': '#FFFFFF',
+          'font-weight': '500',
+        })
+        .selector('node[createdBy="system"]').style({
+          'background-color': NODE_COLORS.system,
+          'border-color': '#B45309',
+          'color': '#FFFFFF',
+          'font-weight': '500',
+        })
         .selector('.resulted').style({
           'line-color': s.resultedLine,
           'target-arrow-color': s.resultedArrow,
