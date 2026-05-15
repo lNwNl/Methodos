@@ -52,6 +52,7 @@ COPY validate-json.js /usr/local/bin/validate-json
 RUN chmod +x /usr/local/bin/validate-json
 
 # Layer 7: opencode configs
+COPY AGENTS.md /home/kali/workspace/AGENTS.md
 RUN mkdir -p /home/kali/workspace/.opencode && \
     echo '{"permission":{"*":{"*":"allow"}}}' > /home/kali/workspace/.opencode/opencode.json && \
     mkdir -p /root/.config/opencode
