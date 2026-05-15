@@ -49,6 +49,7 @@ export async function ensureContainer(
     await podman([
       'run', '-d', '--name', name,
       '--cap-add=NET_RAW',
+      '--security-opt', 'seccomp=unconfined',
       ...bindArgs,
       '-w', '/home/kali/workspace',
       imageTag, 'sleep', 'infinity',
