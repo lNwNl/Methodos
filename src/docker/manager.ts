@@ -46,12 +46,13 @@ export async function ensureContainer(
     bindArgs.push('-v', bind);
   }
 
-  await podman([
-    'run', '-d', '--name', name,
-    ...bindArgs,
-    '-w', '/home/kali/workspace',
-    imageTag, 'sleep', 'infinity',
-  ], 120000);
+    await podman([
+      'run', '-d', '--name', name,
+      '--cap-add=NET_RAW',
+      ...bindArgs,
+      '-w', '/home/kali/workspace',
+      imageTag, 'sleep', 'infinity',
+    ], 120000);
 
   await injectOpencodeConfig(name);
 }
