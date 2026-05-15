@@ -54,19 +54,19 @@ createApp({
           'border-color': s.nodeBorder,
           'color': s.nodeText,
         })
-        .selector('node[createdBy="human"]').style({
+        .selector('.type-human').style({
           'background-color': NODE_COLORS.human,
           'border-color': '#3730A3',
           'color': '#FFFFFF',
           'font-weight': '500',
         })
-        .selector('node[createdBy="agent"]').style({
+        .selector('.type-agent').style({
           'background-color': NODE_COLORS.agent,
           'border-color': '#0F766E',
           'color': '#FFFFFF',
           'font-weight': '500',
         })
-        .selector('node[createdBy="system"]').style({
+        .selector('.type-system').style({
           'background-color': NODE_COLORS.system,
           'border-color': '#B45309',
           'color': '#FFFFFF',
@@ -185,10 +185,14 @@ createApp({
       const isCompleted = p.status === 'completed';
 
       for (const n of p.nodes) {
+        var cls = '';
+        if (n.created_by === 'human') cls = 'type-human';
+        else if (n.created_by === 'agent') cls = 'type-agent';
+        else if (n.created_by === 'system') cls = 'type-system';
         desired.set(`n${n.id}`, {
           group: 'nodes',
           data: { id: `n${n.id}`, label: trunc(n.description, 55), description: n.description, createdBy: n.created_by, nodeId: n.id },
-          classes: '',
+          classes: cls,
         });
       }
 
@@ -271,9 +275,9 @@ createApp({
         elements,
         style: [
           { selector: 'node', style: { 'label': 'data(label)', 'background-color': s.nodeBg, 'border-width': 1.5, 'border-color': s.nodeBorder, 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'color': s.nodeText, 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
-          { selector: 'node[createdBy="human"]',  style: { 'background-color': NODE_COLORS.human, 'border-color': '#3730A3', 'color': '#FFFFFF', 'font-weight': '500' } },
-          { selector: 'node[createdBy="agent"]',  style: { 'background-color': NODE_COLORS.agent, 'border-color': '#0F766E', 'color': '#FFFFFF', 'font-weight': '500' } },
-          { selector: 'node[createdBy="system"]', style: { 'background-color': NODE_COLORS.system, 'border-color': '#B45309', 'color': '#FFFFFF', 'font-weight': '500' } },
+          { selector: '.type-human',  style: { 'background-color': NODE_COLORS.human, 'border-color': '#3730A3', 'color': '#FFFFFF', 'font-weight': '500' } },
+          { selector: '.type-agent',  style: { 'background-color': NODE_COLORS.agent, 'border-color': '#0F766E', 'color': '#FFFFFF', 'font-weight': '500' } },
+          { selector: '.type-system', style: { 'background-color': NODE_COLORS.system, 'border-color': '#B45309', 'color': '#FFFFFF', 'font-weight': '500' } },
           { selector: '.resulted', style: { 'width': 1.5, 'line-color': s.resultedLine, 'target-arrow-color': s.resultedArrow, 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.resultedText, 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.pending', style: { 'width': 1.2, 'line-color': s.pendingLine, 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.pendingText, 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#6366F1', 'line-style': 'dashed', 'target-arrow-color': '#6366F1', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#6366F1', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
