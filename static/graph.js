@@ -167,6 +167,14 @@ createApp({
         await nextTick();
         renderGraph();
         graphReady.value = true;
+        if (data.status === 'completed' && !selected.value) {
+          const evIds = (data.evidence_node_ids || []).filter(id => data.nodes.some(n => n.id === id));
+          selected.value = { type: 'complete', summary: data.summary, evidenceIds: evIds };
+          if (cy) {
+            const cn = cy.getElementById('complete_node');
+            if (cn.length) highlightNode(cn);
+          }
+        }
       } catch (e) {
         error.value = `无法加载: ${e.message}`;
         loading.value = false;
@@ -533,11 +541,6 @@ createApp({
     <div v-else-if="error" class="empty-state flex-1" style="color:var(--danger)">{{ error }}</div>
 
     <template v-else-if="project">
-      <div v-if="project.status === 'completed' && project.summary" class="summary-bar">
-        <span class="badge badge-completed" style="margin-right:0.5rem">完成</span>
-        {{ project.summary }}
-      </div>
-
       <div class="flex flex-1 min-h-0" style="flex:1;min-height:0;gap:0">
         <div class="graph-container flex-1" style="flex:1;min-width:0;border-right:none;position:relative">
           <div v-if="!graphReady" class="graph-loading-overlay">
