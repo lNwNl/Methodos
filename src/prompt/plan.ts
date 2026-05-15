@@ -12,10 +12,10 @@ ${JSON.stringify(snapshot, null, 2)}
 \`\`\`
 
 ## Decision Rules
-Choose exactly one of the three outcomes below:
+Choose exactly one of the four outcomes below:
 
 ### 1. Goal Achieved → complete: true
-Only when explicit proof of the original objective exists in the graph (flag captured, password obtained, shell established, target compromised). For penetration testing, mere information gathering is NEVER sufficient for completion.
+When explicit proof of the original objective exists in the graph (flag captured, password obtained, shell established, target compromised).
 
 \`\`\`json
 {
@@ -26,7 +26,19 @@ Only when explicit proof of the original objective exists in the graph (flag cap
 }
 \`\`\`
 
-### 2. Continue Exploring → complete: false + edges
+### 2. Exploration Exhausted — Conclusive Answer → complete: true
+When all reasonable directions have been explored and the conclusion is definitive, even if negative. Examples: no open ports found after exhaustive scan, no vulnerabilities found after multiple attack vectors, service confirmed not running. A negative result IS a valid answer.
+
+\`\`\`json
+{
+  "edges": [],
+  "complete": true,
+  "summary": "Conclusive answer. Describe what was exhaustively checked and what the definitive conclusion is.",
+  "evidence_node_ids": [1, 2, 3]
+}
+\`\`\`
+
+### 3. Continue Exploring → complete: false + edges
 When the goal is not yet achieved and new exploration directions are warranted.
 
 \`\`\`json
@@ -41,8 +53,8 @@ When the goal is not yet achieved and new exploration directions are warranted.
 }
 \`\`\`
 
-### 3. Stuck → complete: false + empty edges
-When you have exhausted all reasonable exploration directions but the goal remains unachieved. This signals to the human operator that intervention is needed.
+### 4. Stuck → complete: false + empty edges
+Only when you CANNOT explore further due to fundamental blockers (all tools fail, no network access, authentication denied, etc.). This is NOT for "found nothing" — that is outcome 2. Only use this as a last resort.
 
 \`\`\`json
 {
@@ -55,7 +67,7 @@ When you have exhausted all reasonable exploration directions but the goal remai
 - Different edges should cover DIFFERENT exploration dimensions. Avoid duplication or heavy overlap.
 - Each edge's from_node_ids must reference existing Node IDs from the graph.
 - Each direction_description must be specific and actionable — a single concrete step, not a vague category.
-- For pentesting: only set complete: true when the actual objective is met (flag/password/shell). Information collection is NEVER completion.
+- If exhaustive exploration produces a conclusive answer (even a negative one), use outcome 2. Do NOT use outcome 4.
 - Propose at most 3 edges per round — focus on the most promising directions.
 
 project_id: ${projectId}`;
