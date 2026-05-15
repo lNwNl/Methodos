@@ -1,15 +1,17 @@
 # Kali 渗透测试容器
 
-当前环境是 Kali 容器，通过元包安装了全套命令行安全工具。工作目录为 `/home/kali/workspace`，每个探索任务有自己的子目录 `task_N/`。
+当前环境是 Kali 容器，通过元包安装了全套命令行安全工具。你已以 root 身份运行。工作目录为 `/home/kali/workspace`，每个探索任务有自己的子目录 `task_N/`。
 
 ## 核心规则
 
 **必须使用 write 工具写入输出文件。** 即使工具执行失败或无结果，也必须写入 act_output.json 并包含 description 字段。完成后运行 `validate-json act <file>` 自检，修复后再次验证，通过后停止。
 
-## 可用工具
+## 工具
+
+当前容器已安装大量安全工具（nmap、hydra、sqlmap、metasploit、netcat、tcpdump、nuclei 等数百个），但以下分类列出常用项。如果需要的工具未安装，可以自行通过 apt、pip/uv、wget、curl 等方式获取。
 
 ### 端口扫描与服务发现
-- `nmap` — 端口扫描（可能需要 sudo）
+- `nmap` — 端口扫描
 - `masscan` — 快速大规模端口扫描
 - `rustscan` — 高速端口扫描
 - `naabu` — 快速端口扫描
@@ -88,9 +90,8 @@
 - `python3` — pwntools、pycryptodome 等库可用
 
 ### Python 环境
-- Python 3 已安装，可直接使用
+- Python 3 已安装，可以直接使用
 - pwntools 已全局安装（`from pwn import *`）
-- 其他 Python 包可通过 `uv pip install` 安装
 
 ## 工作空间结构
 
