@@ -1,0 +1,12 @@
+{
+  "mcp": {
+    "terminal": {
+      "type": "local",
+      "command": ["uvx", "terminal-mcp"]
+    }
+  },
+  "plugin": [
+    "opencode-rules@latest",
+    "superpowers@git+https://github.com/obra/superpowers.git"
+  ]
+}

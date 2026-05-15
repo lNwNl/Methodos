@@ -2,13 +2,13 @@ import { getContainerName } from './index';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
+import { readFileSync, existsSync } from 'node:fs';
 
 const home = homedir();
 const PODMAN = process.env.DOCKER_BIN || 'podman';
 
 function getOpenCodeBinds(): string[] {
   return [
-    `${join(home, '.config/opencode')}:/root/.config/opencode:ro`,
     `${join(home, '.local/share/opencode')}:/root/.local/share/opencode`,
     `${join(home, '.agents')}:/root/.agents:ro`,
   ];
@@ -52,6 +52,40 @@ export async function ensureContainer(
     '-w', '/home/kali/workspace',
     imageTag, 'sleep', 'infinity',
   ], 120000);
+
+  await injectOpencodeConfig(name);
+}
+
+async function injectOpencodeConfig(containerName: string): Promise<void> {
+  const hostConfigPath = join(home, '.config/opencode/opencode.json');
+  if (!existsSync(hostConfigPath)) return;
+
+  const hostConfig = JSON.parse(readFileSync(hostConfigPath, 'utf-8'));
+  const merged: any = { mcp: {}, plugin: [] };
+
+  // Copy context7 and exa from host config (includes API keys in headers)
+  for (const key of ['context7', 'exa']) {
+    if (hostConfig.mcp?.[key]) {
+      merged.mcp[key] = hostConfig.mcp[key];
+    }
+  }
+
+  // Add terminal MCP
+  merged.mcp.terminal = { type: 'local', command: ['uvx', 'terminal-mcp'] };
+
+  // Copy plugins from host
+  if (hostConfig.plugin) {
+    merged.plugin = hostConfig.plugin;
+  }
+
+  return new Promise<void>((resolve) => {
+    const child = execFile(PODMAN, [
+      'exec', '-i', containerName,
+      'tee', '/root/.config/opencode/opencode.json',
+    ], { timeout: 10000 }, () => resolve());
+    child.stdin?.write(JSON.stringify(merged, null, 2));
+    child.stdin?.end();
+  });
 }
 
 export async function stopContainer(projectId: number): Promise<void> {
