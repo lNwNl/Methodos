@@ -54,7 +54,7 @@ createApp({
         case 'circle':
           return { ...base, name: 'circle' };
         case 'cose':
-          return { ...base, name: 'cose', idealEdgeLength: 120, nodeRepulsion: 8000, numIter: 2000, randomize: false, gravity: 0.25 };
+          return { ...base, name: 'cose', idealEdgeLength: 200, nodeRepulsion: 400000, nodeOverlap: 50, componentSpacing: 100, numIter: 2500, randomize: false, gravity: 0.1 };
         default:
           return { ...base, name: 'dagre', rankDir: 'TB', spacingFactor: 1.4, nodeDimensionsIncludeLabels: true };
       }
