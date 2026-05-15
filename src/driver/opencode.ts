@@ -49,13 +49,12 @@ export class OpenCodeDriver implements AgentDriver {
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
     await execInContainer(this.projectId, [
-      this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
+      this.cliPath, 'run', '--format', 'json', '--pure', '--dangerously-skip-permissions', '--dir', params.workdir,
       `Follow plan_prompt.md to write and validate plan_output_${params.round}.json, then stop.`,
       '-f', promptPath,
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
-      env: { OPENCODE_DANGEROUSLY_SKIP_PERMISSIONS: 'true' },
     });
 
     const output = await this.tryReadOutputFile(outputPath);
@@ -80,13 +79,12 @@ export class OpenCodeDriver implements AgentDriver {
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
     const result = await execInContainer(this.projectId, [
-      this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
+      this.cliPath, 'run', '--format', 'json', '--pure', '--dangerously-skip-permissions', '--dir', params.workdir,
       'Follow act_prompt.md to write and validate act_output.json, then stop.',
       '-f', promptPath,
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
-      env: { OPENCODE_DANGEROUSLY_SKIP_PERMISSIONS: 'true' },
     });
 
     const sessionId = findSessionId(result.stdout) || `fallback-${Date.now()}`;
@@ -112,14 +110,13 @@ export class OpenCodeDriver implements AgentDriver {
     await writeFileInContainer(this.projectId, promptPath, params.prompt);
 
     await execInContainer(this.projectId, [
-      this.cliPath, 'run', '--format', 'json', '--pure', '--dir', params.workdir,
+      this.cliPath, 'run', '--format', 'json', '--pure', '--dangerously-skip-permissions', '--dir', params.workdir,
       '--session', params.sessionId,
       '停止探索，总结已有成果。将结果写入 conclude_output.json，然后停止。',
       '-f', promptPath,
     ], {
       workdir: params.workdir,
       timeout: params.timeout,
-      env: { OPENCODE_DANGEROUSLY_SKIP_PERMISSIONS: 'true' },
     });
 
     const output = await this.tryReadOutputFile(outputPath);
