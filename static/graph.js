@@ -97,12 +97,6 @@ createApp({
     const draggedPositions = new Map();
 
     const TRANSIENT_CLASSES = new Set(['dimmed', 'focus', 'evidence']);
-    const TBG = {
-      'text-background-color': '#1E2030',
-      'text-background-opacity': 0.85,
-      'text-background-padding': '2px',
-      'text-background-shape': 'round-rectangle',
-    };
 
     const LAYOUT_NAMES = {
       dagre_tb: '从上到下',
@@ -264,6 +258,9 @@ createApp({
     }
 
     function initGraph(container, desired, p) {
+      var theme = currentTheme();
+      var s = CY_THEME[theme] || CY_THEME.light;
+
       const elements = [];
       for (const [, spec] of desired) {
         elements.push({ group: spec.group, data: spec.data, classes: spec.classes || '' });
@@ -273,15 +270,15 @@ createApp({
         container,
         elements,
         style: [
-          { selector: 'node', style: { 'label': 'data(label)', 'background-color': '#3A3E52', 'border-width': 1.5, 'border-color': '#2A2D3E', 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'color': '#CBD5E1', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
+          { selector: 'node', style: { 'label': 'data(label)', 'background-color': s.nodeBg, 'border-width': 1.5, 'border-color': s.nodeBorder, 'font-size': '11px', 'text-wrap': 'wrap', 'text-max-width': '180px', 'text-valign': 'center', 'text-halign': 'center', 'color': s.nodeText, 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
           { selector: 'node[createdBy="human"]',  style: { 'background-color': NODE_COLORS.human, 'border-color': '#3730A3', 'color': '#FFFFFF', 'font-weight': '500' } },
           { selector: 'node[createdBy="agent"]',  style: { 'background-color': NODE_COLORS.agent, 'border-color': '#0F766E', 'color': '#FFFFFF', 'font-weight': '500' } },
           { selector: 'node[createdBy="system"]', style: { 'background-color': NODE_COLORS.system, 'border-color': '#B45309', 'color': '#FFFFFF', 'font-weight': '500' } },
-          { selector: '.resulted', style: { 'width': 1.5, 'line-color': '#5B6E8A', 'target-arrow-color': '#5B6E8A', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#5B6E8A', 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', ...TBG } },
-          { selector: '.pending', style: { 'width': 1.2, 'line-color': '#94A3B8', 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#94A3B8', 'font-family': 'Inter, sans-serif', ...TBG } },
-          { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#6366F1', 'line-style': 'dashed', 'target-arrow-color': '#6366F1', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#6366F1', 'font-family': 'Inter, sans-serif', ...TBG } },
+          { selector: '.resulted', style: { 'width': 1.5, 'line-color': s.resultedLine, 'target-arrow-color': s.resultedArrow, 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.resultedText, 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
+          { selector: '.pending', style: { 'width': 1.2, 'line-color': s.pendingLine, 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '9px', 'color': s.pendingText, 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
+          { selector: '.edge-running', style: { 'width': 1.5, 'line-color': '#6366F1', 'line-style': 'dashed', 'target-arrow-color': '#6366F1', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '9px', 'color': '#6366F1', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.conclusion', style: { 'width': 2.5, 'line-color': '#3C5DFF', 'target-arrow-color': '#3C5DFF', 'target-arrow-shape': 'triangle', 'curve-style': 'straight', 'line-style': 'solid' } },
-          { selector: '.ghost', style: { 'width': 8, 'height': 8, 'background-color': 'transparent', 'border-width': 1.5, 'border-color': '#3A3E52', 'border-style': 'dashed', 'border-opacity': 0.35 } },
+          { selector: '.ghost', style: { 'width': 8, 'height': 8, 'background-color': 'transparent', 'border-width': 1.5, 'border-color': s.ghostBorder, 'border-style': 'dashed', 'border-opacity': 0.35 } },
           { selector: '.ghost-running', style: { 'width': 9, 'height': 9, 'background-color': '#3C5DFF', 'background-opacity': 0.15, 'border-width': 1.5, 'border-color': '#3C5DFF', 'border-style': 'dashed', 'border-opacity': 0.5 } },
           { selector: '.complete-node', style: { 'shape': 'round-rectangle', 'background-color': '#3C5DFF', 'border-width': 1.5, 'border-color': '#3C5DFF', 'font-size': '11px', 'font-weight': '600', 'color': '#FFFFFF', 'text-wrap': 'wrap', 'text-max-width': '160px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'font-family': 'Inter, sans-serif' } },
           { selector: '.evidence', style: { 'border-color': '#F59E0B', 'border-width': 2.5 } },
@@ -292,7 +289,6 @@ createApp({
       });
 
       applyEvidence(p);
-      applyCyTheme(currentTheme());
       registerEvents();
     }
 
