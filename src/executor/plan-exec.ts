@@ -46,7 +46,7 @@ export function executePlan(
 
   return driver.executePlan({
     prompt,
-    workdir: '/home/kali/workspace/',
+    workdir: '/home/kali/workspace',
     timeout: config.planTimeoutMs,
     round,
   }).then((output) => {
