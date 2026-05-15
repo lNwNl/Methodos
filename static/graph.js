@@ -89,9 +89,16 @@ createApp({
 
     async function fetchProject() {
       try {
-        const r = await fetch(`/projects/${projectId}`);
-        if (!r.ok) throw new Error(String(r.status));
-        project.value = await r.json();
+        let data;
+        if (window.__preload) {
+          data = await window.__preload;
+          window.__preload = null;
+        } else {
+          const r = await fetch(`/projects/${projectId}`);
+          if (!r.ok) throw new Error(String(r.status));
+          data = await r.json();
+        }
+        project.value = data;
         error.value = '';
         await nextTick();
         renderGraph();

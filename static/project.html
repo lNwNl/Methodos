@@ -5,13 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Methodos — 项目详情</title>
   <link rel="stylesheet" href="/theme.css">
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+</head>
+<body>
+  <div id="app">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;color:var(--text-dim, #64748B);font-family:Inter,sans-serif;font-size:0.8rem;gap:0.75rem">
+      <div style="width:20px;height:20px;border:2px solid var(--border, #2A2D3E);border-top-color:var(--primary, #3C5DFF);border-radius:50%;animation:spin 0.7s linear infinite"></div>
+      加载中...
+    </div>
+  </div>
+  <script>
+    (function() {
+      var id = new URLSearchParams(location.search).get('id');
+      if (id) window.__preload = fetch('/projects/' + id).then(function(r) { return r.json(); });
+    })();
+  </script>
   <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
   <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
   <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
-</head>
-<body>
-  <div id="app"></div>
   <script src="/graph.js"></script>
 </body>
 </html>
