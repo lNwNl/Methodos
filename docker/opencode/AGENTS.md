@@ -4,7 +4,7 @@
 
 ## 核心规则
 
-**必须使用 write 工具写入输出文件。** 即使工具执行失败或无结果，也必须写入 act_output.json 并包含 description 字段。完成后运行 `validate-json act <file>` 自检，修复后再次验证，通过后停止。
+**必须使用 write 工具写入输出文件。** 即使工具执行失败或无结果，也必须写入 act_output.json 并包含 description 字段。
 
 ## 工具
 
@@ -111,6 +111,4 @@
 1. 阅读 `plan_prompt.md` / `act_prompt.md` 了解当前任务
 2. 执行探索命令，保存原始输出到当前 task 目录
 3. **始终**使用 write 工具写入 JSON 输出文件
-4. 运行 `validate-json act <output.json>` 验证格式
-5. 如果验证失败，修复 JSON 后重新验证
-6. 验证通过后停止
+4. 写入完成后停止

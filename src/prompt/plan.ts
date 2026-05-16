@@ -6,7 +6,7 @@ export function renderPlanPrompt(snapshot: Snapshot, projectId: number, round: n
 
 你的职责是规划，不是执行。不要运行 nmap、curl、sqlmap 等探索命令——这些由其他执行者完成。你应该专注于分析已有发现，规划接下来的探索方向。
 
-将决策保存到 ${file}。然后运行 \`validate-json plan ${file}\`，验证失败则修复后重试，直到通过。
+将决策保存到 ${file}。
 
 所有文本字段（title、summary、direction_description）必须是中文。
 

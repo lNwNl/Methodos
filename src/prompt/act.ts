@@ -23,7 +23,7 @@ ${directionDescription}
 - **异常即停**：如果目标响应变慢、连接超时或出现大量失败，立即停止当前命令，不要重试
 
 ## 输出格式
-无论探索成功或失败，都必须写入 ${outputFile}。使用 write 工具写入，然后运行 \`validate-json act ${outputFile}\`，验证失败则修复后重试，直到通过。
+无论探索成功或失败，都必须写入 ${outputFile}。使用 write 工具写入。
 
 \`\`\`json
 {
