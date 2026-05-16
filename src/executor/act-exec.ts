@@ -21,9 +21,9 @@ export function executeAct(
   db: Database.Database,
   projectId: number,
   driver: AgentDriver,
-  ts: string,
+  _ts: string,
 ): Promise<{ success: boolean; edgeId?: number; error?: string }> {
-  const edge = claimEdge(db, projectId, config.maxFailures, config.claimedExpiryMs, ts);
+  const edge = claimEdge(db, projectId, config.maxFailures, config.claimedExpiryMs, new Date().toISOString());
   if (!edge) {
     return Promise.resolve({ success: false, edgeId: undefined, error: 'No unclaimed edge' });
   }
@@ -34,7 +34,7 @@ export function executeAct(
   });
 
   const workdir = `/home/kali/workspace/task_${edge.id}`;
-  const prompt = renderActPrompt(snapshot, edge.direction_description, workdir, projectId, edge.id);
+  const prompt = renderActPrompt(snapshot, edge.direction_description, workdir, projectId);
 
   return driver.executeAct({
     prompt,
@@ -57,6 +57,7 @@ export function executeAct(
       }
     }
 
+    const ts = new Date().toISOString();
     const parsed = agentOutputSchema.safeParse(output);
     if (!parsed.success) {
       handleActFailure(db, projectId, edge.id, config.maxFailures, ts);
@@ -70,6 +71,7 @@ export function executeAct(
       return { success: false, edgeId: edge.id, error: err.message };
     }
   }).catch((err) => {
+    const ts = new Date().toISOString();
     handleActFailure(db, projectId, edge.id, config.maxFailures, ts);
     return { success: false, edgeId: edge.id, error: err.message };
   });

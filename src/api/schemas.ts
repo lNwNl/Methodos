@@ -71,3 +71,14 @@ export const edgeStatusSchema = z.object({
   created_at: z.string(),
   status: z.enum(['pending', 'running', 'completed']),
 });
+
+export const settingsSchema = z.object({
+  actTimeoutMs: z.number().int().min(1000).optional(),
+  planTimeoutMs: z.number().int().min(1000).optional(),
+  claimedExpiryMs: z.number().int().min(1000).optional(),
+  tickIntervalMs: z.number().int().min(100).optional(),
+  maxFailures: z.number().int().min(1).optional(),
+  maxActConcurrency: z.number().int().min(1).optional(),
+  snapshotMaxNodes: z.number().int().min(10).optional(),
+  snapshotMaxEdges: z.number().int().min(10).optional(),
+});

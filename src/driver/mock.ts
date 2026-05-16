@@ -42,13 +42,12 @@ export class MockAgentDriver implements AgentDriver {
   }
 
   async executeAct(params: { prompt: string; workdir: string; timeout: number }): Promise<ActResult> {
-    const edgeId = this.extractEdgeId(params.prompt);
     const sessionId = `mock-session-${Date.now()}`;
 
     return {
       output: {
         title: '端口开放',
-        description: `探索结果 [边 ${edgeId}]: 发现开放端口和服务信息`,
+        description: '探索结果：发现开放端口和服务信息',
       },
       sessionId,
     };
@@ -62,12 +61,7 @@ export class MockAgentDriver implements AgentDriver {
   }
 
   private extractProjectId(prompt: string): number {
-    const match = prompt.match(/project_id:\s*(\d+)/);
-    return match ? parseInt(match[1], 10) : 0;
-  }
-
-  private extractEdgeId(prompt: string): number {
-    const match = prompt.match(/edge_id:\s*(\d+)/);
+    const match = prompt.match(/项目\s*ID:\s*(\d+)/);
     return match ? parseInt(match[1], 10) : 0;
   }
 }

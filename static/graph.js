@@ -14,7 +14,7 @@ createApp({
     const showPushModal = ref(false);
     const pushNodes = ref([{ description: '' }]);
     const panelWidth = ref(Number(localStorage.getItem('methodos-panel-width') || 320));
-    const layoutKey = ref(localStorage.getItem('methodos-layout') || 'dagre_tb');
+    const layoutKey = ref(localStorage.getItem('methodos-layout') || 'dagre_lr');
     const panelTab = ref(selected.value ? 'detail' : 'log');
     const graphReady = ref(false);
     let completedSelected = false;
@@ -29,9 +29,9 @@ createApp({
       },
       light: {
         nodeBg: '#F1F5F9', nodeBorder: '#CBD5E1', nodeText: '#334155',
-        resultedLine: '#6B7FA3', resultedArrow: '#6B7FA3', resultedText: '#6B7FA3',
-        pendingLine: '#CBD5E1', pendingText: '#94A3B8',
-        ghostBorder: '#CBD5E1', tbg: '#FFFFFF',
+        resultedLine: '#4B5E7C', resultedArrow: '#4B5E7C', resultedText: '#334155',
+        pendingLine: '#94A3B8', pendingText: '#475569',
+        ghostBorder: '#CBD5E1', tbg: '#F1F5F9',
       },
     };
 
@@ -50,26 +50,39 @@ createApp({
     function nodeInlineStyle(createdBy, theme) {
       var s = CY_THEME[theme] || CY_THEME.light;
       var bg, fg, bd, fw;
-      if (createdBy === 'human')       { bg = '#4F46E5'; bd = '#3730A3'; fg = '#FFFFFF'; fw = '500'; }
-      else if (createdBy === 'agent')  { bg = '#0D9488'; bd = '#0F766E'; fg = '#FFFFFF'; fw = '500'; }
-      else if (createdBy === 'system') { bg = '#78716C'; bd = '#57534E'; fg = '#FFFFFF'; fw = '500'; }
+      var light = theme === 'light';
+      if (createdBy === 'human')       { bg = light ? '#EEF2FF' : '#4F46E5'; bd = light ? '#C7D2FE' : '#3730A3'; fg = light ? '#1E293B' : '#FFFFFF'; fw = light ? '600' : '500'; }
+      else if (createdBy === 'agent')  { bg = light ? '#F0FDFA' : '#0D9488'; bd = light ? '#CCFBF1' : '#0F766E'; fg = light ? '#134E4A' : '#FFFFFF'; fw = light ? '600' : '500'; }
+      else if (createdBy === 'system') { bg = light ? '#F5F5F4' : '#78716C'; bd = light ? '#D6D3D1' : '#57534E'; fg = light ? '#1C1917' : '#FFFFFF'; fw = light ? '600' : '500'; }
       else                             { bg = s.nodeBg;  bd = s.nodeBorder; fg = s.nodeText; fw = '400'; }
       return { 'background-color': bg, 'border-color': bd, 'color': fg, 'font-weight': fw };
     }
 
     function startNodeStyle(theme) {
+      var light = theme === 'light';
+      if (light) return { 'background-color': '#EDE9FE', 'border-color': '#C4B5FD', 'color': '#4C1D95', 'font-weight': '600' };
       return { 'background-color': '#7C3AED', 'border-color': '#6D28D9', 'color': '#FFFFFF', 'font-weight': '600' };
     }
 
     function endNodeStyle(theme) {
+      var light = theme === 'light';
+      if (light) return { 'background-color': '#D1FAE5', 'border-color': '#6EE7B7', 'color': '#064E3B', 'font-weight': '600' };
       return { 'background-color': '#047857', 'border-color': '#065F46', 'color': '#FFFFFF', 'font-weight': '600' };
+    }
+
+    function completeNodeStyle(theme) {
+      var light = theme === 'light';
+      if (light) return { 'background-color': '#DBEAFE', 'border-color': '#93C5FD', 'color': '#1E3A5F', 'font-weight': '600' };
+      return { 'background-color': '#3C5DFF', 'border-color': '#3C5DFF', 'color': '#FFFFFF', 'font-weight': '600' };
     }
 
     function applyNodeInlineStyles(theme) {
       if (!cy) return;
       cy.nodes().forEach(function(node) {
-        if (node.data('ghost') || node.data('complete')) return;
-        if (node.data('isStart')) {
+        if (node.data('ghost')) return;
+        if (node.data('complete')) {
+          node.style(completeNodeStyle(theme));
+        } else if (node.data('isStart')) {
           node.style(startNodeStyle(theme));
         } else if (node.data('isEnd')) {
           node.style(endNodeStyle(theme));
@@ -112,8 +125,8 @@ createApp({
     const TRANSIENT_CLASSES = new Set(['dimmed', 'focus', 'evidence']);
 
     const LAYOUT_NAMES = {
-      dagre_tb: '从上到下',
       dagre_lr: '从左到右',
+      dagre_tb: '从上到下',
       breadthfirst: '广度优先',
       concentric: '同心圆',
       circle: '环形总览',
@@ -309,7 +322,7 @@ createApp({
         container,
         elements,
         style: [
-          { selector: 'node', style: { 'label': 'data(label)', 'border-width': 1.5, 'font-size': '13px', 'text-wrap': 'wrap', 'text-max-width': '200px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
+          { selector: 'node', style: { 'label': 'data(label)', 'border-width': 1.5, 'font-size': '13px', 'text-wrap': 'wrap', 'text-max-width': '120px', 'text-valign': 'center', 'text-halign': 'center', 'padding': '8px', 'shape': 'round-rectangle', 'font-family': 'Inter, sans-serif', 'transition-property': 'opacity', 'transition-duration': 300 } },
           { selector: '.resulted', style: { 'label': 'data(label)', 'width': 1.5, 'line-color': s.resultedLine, 'target-arrow-color': s.resultedArrow, 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '10px', 'color': s.resultedText, 'text-rotation': 'autorotate', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.pending', style: { 'label': 'data(label)', 'width': 1.2, 'line-color': s.pendingLine, 'line-style': 'dashed', 'curve-style': 'bezier', 'font-size': '10px', 'color': s.pendingText, 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
           { selector: '.edge-running', style: { 'label': 'data(label)', 'width': 1.5, 'line-color': '#6366F1', 'line-style': 'dashed', 'target-arrow-color': '#6366F1', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '10px', 'color': '#6366F1', 'font-family': 'Inter, sans-serif', 'text-background-color': s.tbg, 'text-background-opacity': 0.85, 'text-background-padding': '2px', 'text-background-shape': 'round-rectangle' } },
@@ -333,6 +346,19 @@ createApp({
       const current = new Set(cy.elements().map(el => el.id()));
       const newIds = new Set();
 
+      const ghostBySource = new Map();
+      cy.nodes().forEach(n => {
+        if (n.data('ghost')) {
+          const gid = n.id();
+          const m = gid.match(/^ghost_e\d+_(\d+)$/);
+          if (m) {
+            const srcId = `n${m[1]}`;
+            if (!ghostBySource.has(srcId)) ghostBySource.set(srcId, []);
+            ghostBySource.get(srcId).push({ x: n.position().x, y: n.position().y });
+          }
+        }
+      });
+
       // Remove stale elements
       cy.elements().forEach(el => {
         if (!desired.has(el.id())) cy.remove(el);
@@ -341,10 +367,20 @@ createApp({
       // Add new and sync classes/data for existing
       for (const [id, spec] of desired) {
         if (!current.has(id)) {
-          const added = cy.add({ group: spec.group, data: spec.data, classes: spec.classes || '' });
+          let pos = undefined;
+          if (spec.group === 'nodes' && !spec.data.ghost && spec.data.isEnd) {
+            const fromIds = p.edges.filter(e => e.to_node_ids.includes(spec.data.nodeId)).flatMap(e => e.from_node_ids);
+            for (const fid of fromIds) {
+              const ghosts = ghostBySource.get(`n${fid}`);
+              if (ghosts && ghosts.length) { pos = ghosts.shift(); break; }
+            }
+          }
+          const added = cy.add({ group: spec.group, data: spec.data, classes: spec.classes || '', position: pos });
           newIds.add(id);
-          if (spec.group === 'nodes' && !spec.data.ghost && !spec.data.complete) {
-            if (spec.data.isStart) {
+          if (spec.group === 'nodes' && !spec.data.ghost) {
+            if (spec.data.complete) {
+              added.style(completeNodeStyle(currentTheme()));
+            } else if (spec.data.isStart) {
               added.style(startNodeStyle(currentTheme()));
             } else if (spec.data.isEnd) {
               added.style(endNodeStyle(currentTheme()));
@@ -385,8 +421,21 @@ createApp({
       applyEvidence(p);
 
       if (newIds.size > 0) {
+        const existingPositions = new Map();
+        cy.nodes().forEach(n => {
+          if (!newIds.has(n.id()) && !draggedPositions.has(n.id())) {
+            existingPositions.set(n.id(), { x: n.position().x, y: n.position().y });
+          }
+        });
+
         cy.layout(layoutOpts(layoutKey.value)).run();
         restoreDragged();
+
+        for (const [id, pos] of existingPositions) {
+          const node = cy.getElementById(id);
+          if (node.length) node.position(pos);
+        }
+
         const fresh = cy.elements().filter(el => newIds.has(el.id()));
         if (fresh.length) {
           fresh.style('opacity', 0);
@@ -548,7 +597,7 @@ createApp({
       const ns = (project.value?.nodes || []);
       return ids.map(id => {
         const node = ns.find(n => n.id === id);
-        return node ? { id, desc: trunc(node.description, 40) } : { id, desc: '' };
+        return node ? { id, title: node.title || trunc(node.description, 30) } : { id, title: '' };
       });
     }
 
@@ -621,7 +670,6 @@ createApp({
     function selectLogEntry(entry) {
       const p = project.value;
       if (!p) return;
-      panelTab.value = 'detail';
       if (entry.type === 'complete') {
         const evIds = (p.evidence_node_ids || []).filter(id => (p.nodes || []).some(n => n.id === id));
         selected.value = { type: 'complete', summary: p.summary, evidenceIds: evIds };
@@ -736,7 +784,7 @@ createApp({
                 <div class="detail-value">
                   <div v-for="ev in evidenceNodesDesc(selected.evidenceIds)" :key="ev.id" style="margin-bottom:3px;display:flex;align-items:center;gap:0.35rem">
                     <span style="flex-shrink:0;font-size:0.7rem;font-weight:600;color:var(--primary);border:1px solid var(--primary);border-radius:3px;padding:0px 4px">#{{ ev.id }}</span>
-                    <span style="font-size:0.75rem;color:var(--text-dim)">{{ ev.desc }}</span>
+                    <span style="font-size:0.75rem;color:var(--text)">{{ ev.title }}</span>
                   </div>
                 </div>
               </div>

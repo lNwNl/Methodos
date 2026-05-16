@@ -354,3 +354,24 @@ export function getEdgeStatuses(db: Database.Database, projectId: number) {
     };
   });
 }
+
+export function getSettings(db: Database.Database): Record<string, string> {
+  const rows = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[];
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    result[row.key] = row.value;
+  }
+  return result;
+}
+
+export function updateSettings(db: Database.Database, settings: Record<string, string>, ts: string): void {
+  const upsert = db.prepare(
+    'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at'
+  );
+  const txn = db.transaction(() => {
+    for (const [k, v] of Object.entries(settings)) {
+      upsert.run(k, String(v), ts);
+    }
+  });
+  txn();
+}

@@ -35,7 +35,7 @@ export function executePlan(
   db: Database.Database,
   projectId: number,
   driver: AgentDriver,
-  ts: string,
+  _ts: string,
 ): Promise<{ success: boolean; error?: string }> {
   const snapshot = renderSnapshot(db, projectId, {
     snapshotMaxNodes: config.snapshotMaxNodes,
@@ -51,8 +51,10 @@ export function executePlan(
     timeout: config.planTimeoutMs,
     round,
   }).then((output) => {
+    const ts = new Date().toISOString();
     return writePlan(db, projectId, output, ts);
   }).catch((err) => {
+    const ts = new Date().toISOString();
     const diag = (err as any).diag;
     const cat = diag?.category || 'unknown';
     // llm_transient is expected and auto-retried — use info level

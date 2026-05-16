@@ -249,6 +249,9 @@ body {
   overflow: hidden;
   position: relative;
 }
+[data-theme="light"] .graph-container {
+  background: var(--bg-root);
+}
 .graph-toolbar {
   position: absolute; top: 0.5rem; left: 0.5rem; z-index: 10;
   display: flex; gap: 0.25rem;

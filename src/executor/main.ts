@@ -3,9 +3,11 @@ import { MockAgentDriver } from '../driver/mock';
 import { OpenCodeDriver } from '../driver/opencode';
 import { createLoop } from './loop';
 import { startServer } from '../api/server';
+import { loadConfigFromDb } from '../config';
 
 initDb();
 const db = getRawDb();
+loadConfigFromDb(db);
 
 const USE_DOCKER = process.argv.includes('--docker');
 

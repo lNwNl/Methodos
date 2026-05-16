@@ -1,4 +1,4 @@
-const { createApp, ref, onMounted, onBeforeUnmount, computed } = Vue;
+const { createApp, ref, reactive, onMounted, onBeforeUnmount, computed } = Vue;
 
 createApp({
   setup() {
@@ -10,6 +10,20 @@ createApp({
     const submitting = ref(false);
     const agents = ref([{ value: 'mock', label: 'Mock（测试）' }]);
     let timer = null;
+
+    const showSettings = ref(false);
+    const settingsLoading = ref(false);
+    const settingsSaving = ref(false);
+    const settings = reactive({
+      actTimeoutMs: 10,
+      planTimeoutMs: 10,
+      claimedExpiryMs: 30,
+      tickIntervalMs: 1,
+      maxFailures: 3,
+      maxActConcurrency: 3,
+      snapshotMaxNodes: 100,
+      snapshotMaxEdges: 200,
+    });
 
     function currentTheme() {
       return document.documentElement.getAttribute('data-theme') || 'light';
@@ -92,6 +106,61 @@ createApp({
       }
     }
 
+    async function fetchSettings() {
+      settingsLoading.value = true;
+      try {
+        const r = await fetch('/settings');
+        const data = await r.json();
+        settings.actTimeoutMs = Math.round((parseInt(data.actTimeoutMs) || 600000) / 60000);
+        settings.planTimeoutMs = Math.round((parseInt(data.planTimeoutMs) || 600000) / 60000);
+        settings.claimedExpiryMs = Math.round((parseInt(data.claimedExpiryMs) || 1800000) / 60000);
+        settings.tickIntervalMs = Math.round((parseInt(data.tickIntervalMs) || 1000) / 1000);
+        settings.maxFailures = parseInt(data.maxFailures) || 3;
+        settings.maxActConcurrency = parseInt(data.maxActConcurrency) || 3;
+        settings.snapshotMaxNodes = parseInt(data.snapshotMaxNodes) || 100;
+        settings.snapshotMaxEdges = parseInt(data.snapshotMaxEdges) || 200;
+      } catch (e) {
+        alert(`加载设置失败: ${e.message}`);
+      } finally {
+        settingsLoading.value = false;
+      }
+    }
+
+    async function saveSettings() {
+      settingsSaving.value = true;
+      try {
+        const body = {
+          actTimeoutMs: settings.actTimeoutMs * 60000,
+          planTimeoutMs: settings.planTimeoutMs * 60000,
+          claimedExpiryMs: settings.claimedExpiryMs * 60000,
+          tickIntervalMs: settings.tickIntervalMs * 1000,
+          maxFailures: settings.maxFailures,
+          maxActConcurrency: settings.maxActConcurrency,
+          snapshotMaxNodes: settings.snapshotMaxNodes,
+          snapshotMaxEdges: settings.snapshotMaxEdges,
+        };
+        const r = await fetch('/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) {
+          const b = await r.json();
+          throw new Error(b.error || String(r.status));
+        }
+        showSettings.value = false;
+      } catch (e) {
+        alert(`保存设置失败: ${e.message}`);
+      } finally {
+        settingsSaving.value = false;
+      }
+    }
+
+    function openSettings() {
+      showSettings.value = true;
+      fetchSettings();
+    }
+
     function statusInfo(p) {
       if (p.status === 'active' && !p.last_plan_at && p.edge_total === 0) {
         return { cls: 'badge-planning', label: '推理中' };
@@ -114,6 +183,7 @@ createApp({
     return {
       projects, loading, error, showModal, form, submitting, agents,
       createProject, stopProject, pushProject, statusInfo, toggleTheme,
+      showSettings, settingsLoading, settingsSaving, settings, openSettings, saveSettings,
     };
   },
 
@@ -126,6 +196,7 @@ createApp({
       </div>
       <div class="app-header-right">
         <button class="theme-toggle" @click="toggleTheme" title="切换主题">◐</button>
+        <button class="btn" @click="openSettings" title="设置">⚙</button>
         <button class="btn btn-primary" @click="showModal = true">+ 新建项目</button>
       </div>
     </div>
@@ -148,6 +219,53 @@ createApp({
           <div class="form-actions">
             <button type="button" class="btn" @click="showModal = false">取消</button>
             <button type="submit" class="btn btn-primary" :disabled="submitting">{{ submitting ? '创建中...' : '创建' }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    </Transition>
+
+    <Transition name="fade">
+    <div v-if="showSettings" class="modal-backdrop" @click.self="showSettings = false">
+      <div class="modal-panel" style="max-width:480px">
+        <h2 class="modal-title">设置</h2>
+        <div v-if="settingsLoading" class="empty-state"><span class="spinner"></span></div>
+        <form v-else @submit.prevent="saveSettings">
+          <div class="form-group">
+            <label class="form-label">Act 超时（分钟）</label>
+            <input type="number" v-model.number="settings.actTimeoutMs" class="input" min="1" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Plan 超时（分钟）</label>
+            <input type="number" v-model.number="settings.planTimeoutMs" class="input" min="1" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">边认领过期（分钟）</label>
+            <input type="number" v-model.number="settings.claimedExpiryMs" class="input" min="1" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tick 间隔（秒）</label>
+            <input type="number" v-model.number="settings.tickIntervalMs" class="input" min="0.1" step="0.1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">最大失败次数</label>
+            <input type="number" v-model.number="settings.maxFailures" class="input" min="1" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">最大并行 Act 数</label>
+            <input type="number" v-model.number="settings.maxActConcurrency" class="input" min="1" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">快照最大节点数</label>
+            <input type="number" v-model.number="settings.snapshotMaxNodes" class="input" min="10" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">快照最大边数</label>
+            <input type="number" v-model.number="settings.snapshotMaxEdges" class="input" min="10" step="1">
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn" @click="showSettings = false">取消</button>
+            <button type="submit" class="btn btn-primary" :disabled="settingsSaving">{{ settingsSaving ? '保存中...' : '保存' }}</button>
           </div>
         </form>
       </div>

@@ -95,7 +95,7 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
       tick().catch((err) => {
         logger.error({ err }, 'Tick error');
       });
-    }, 1000);
+    }, config.tickIntervalMs);
 
     return () => {
       state.running = false;

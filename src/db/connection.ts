@@ -68,7 +68,35 @@ export function initDb() {
       created_at TEXT NOT NULL,
       PRIMARY KEY (project_id, id)
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
+
+  const existing = sqlite.prepare('SELECT COUNT(*) as count FROM settings').get() as { count: number };
+  if (existing.count === 0) {
+    const now = new Date().toISOString();
+    const defaults: Record<string, string> = {
+      actTimeoutMs: '600000',
+      planTimeoutMs: '600000',
+      claimedExpiryMs: '1800000',
+      tickIntervalMs: '1000',
+      maxFailures: '3',
+      maxActConcurrency: '3',
+      snapshotMaxNodes: '100',
+      snapshotMaxEdges: '200',
+    };
+    const insert = sqlite.prepare('INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)');
+    const txn = sqlite.transaction(() => {
+      for (const [k, v] of Object.entries(defaults)) {
+        insert.run(k, v, now);
+      }
+    });
+    txn();
+  }
 
   return getDb();
 }

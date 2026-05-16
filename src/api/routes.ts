@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import Database from 'better-sqlite3';
-import { createProjectSchema, pushProjectSchema } from './schemas';
+import { createProjectSchema, pushProjectSchema, settingsSchema } from './schemas';
 
 export function registerRoutes(app: FastifyInstance, db: Database.Database, useDocker = false) {
   // GET /mode
@@ -129,5 +129,28 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
     if (!project) return reply.status(404).send({ error: 'Project not found' });
 
     return getEdgeStatuses(db, id);
+  });
+
+  // GET /settings
+  app.get('/settings', async (_request, _reply) => {
+    const { getSettings } = await import('../db/operations');
+    return getSettings(db);
+  });
+
+  // PUT /settings
+  app.put('/settings', async (request, reply) => {
+    const parsed = settingsSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues });
+    }
+
+    const { getSettings, updateSettings } = await import('../db/operations');
+    const { reloadConfig } = await import('../config');
+
+    const ts = new Date().toISOString();
+    updateSettings(db, parsed.data as Record<string, string>, ts);
+    reloadConfig(db);
+
+    return reply.header('HX-Trigger', 'settingsUpdated').send(getSettings(db));
   });
 }

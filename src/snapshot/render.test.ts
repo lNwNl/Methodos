@@ -65,7 +65,7 @@ describe('renderSnapshot', () => {
     expect(snap.edges).toHaveLength(0);
   });
 
-  it('includes edges and their nodes', () => {
+  it('includes completed edges and their nodes', () => {
     insertEdges(db, projectId, [{ from_node_ids: [1], direction_description: 'scan' }], now);
     writeActResult(db, projectId, 1, null, 'Port 80 open', 'agent', '2026-05-14T00:01:00.000Z');
 
@@ -76,7 +76,18 @@ describe('renderSnapshot', () => {
     expect(snap.edges[0].to_node_ids).toEqual([2]);
   });
 
-  it('preserves human nodes and unresulted edges during truncation', () => {
+  it('filters out unresulted edges', () => {
+    insertEdges(db, projectId, [{ from_node_ids: [1], direction_description: 'scan' }], now);
+    writeActResult(db, projectId, 1, null, 'Port 80 open', 'agent', '2026-05-14T00:01:00.000Z');
+    insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'sql injection' }], '2026-05-14T00:02:00.000Z');
+    insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'dir enum' }], '2026-05-14T00:03:00.000Z');
+
+    const snap = renderSnapshot(db, projectId, { snapshotMaxNodes: 100, snapshotMaxEdges: 200 });
+    expect(snap.edges).toHaveLength(1);
+    expect(snap.edges[0].direction_description).toBe('scan');
+  });
+
+  it('preserves human nodes during truncation', () => {
     const times = Array.from({ length: 10 }, (_, i) =>
       `2026-05-14T00:0${i}:00.000Z`
     );
@@ -86,18 +97,11 @@ describe('renderSnapshot', () => {
       writeActResult(db, projectId, i + 1, null, `result ${i}`, 'agent', times[i]);
     }
 
-    // Add an unresulted edge
-    insertEdges(db, projectId, [{ from_node_ids: [1], direction_description: 'pending step' }], '2026-05-14T00:10:00.000Z');
-
     const snap = renderSnapshot(db, projectId, { snapshotMaxNodes: 5, snapshotMaxEdges: 200 });
 
     const humanNode = snap.nodes.find(n => n.created_by === 'human');
     expect(humanNode).toBeDefined();
 
-    const pendingEdge = snap.edges.find(e => e.to_node_ids.length === 0);
-    expect(pendingEdge).toBeDefined();
-    expect(pendingEdge!.direction_description).toBe('pending step');
-
-    expect(snap.nodes.length).toBeLessThanOrEqual(6); // max 5 + potential extra human/unresulted
+    expect(snap.nodes.length).toBeLessThanOrEqual(6);
   });
 });
