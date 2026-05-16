@@ -16,7 +16,7 @@ ${directionDescription}
 
 ## 网络请求控制
 遵守以下规则：
-- **并发限制**：所有网络扫描工具必须将并发数设为最低。nmap 使用 -T1 --max-rate=10 -n（每秒最多10个包，-n 禁止反向 DNS 解析以加快扫描速度）；gobuster、dirsearch、ffuf 等工具必须加 -t 1（线程数为1）；curl、wget 等HTTP工具禁止并行请求
+- **速率控制**：网络扫描工具需控制速率避免对目标造成过大压力。nmap 使用 -T3 --max-rate=50 -n（每秒最多50个包，-n 禁止反向 DNS 解析以加快扫描速度）；gobuster、dirsearch、ffuf 等工具必须加 -t 1（线程数为1）；curl、wget 等HTTP工具禁止并行请求
 - **请求间隔**：每个网络请求之间必须间隔至少 2 秒。批量探测时主动 sleep 控制节奏
 - **异常降速**：如果目标响应变慢、连接超时或出现大量失败，等待 10-30 秒后以更低速率重试（如 nmap 降低 --max-rate，gobuster 使用 -t 1 基础上再加 --delay 等），不要直接放弃
 
