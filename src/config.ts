@@ -12,9 +12,9 @@ const DEFAULTS: Record<string, number> = {
   snapshotMaxEdges: 200,
   maxValidationRetries: 3,
   planMinIntervalMs: 5000,
-  priorityBoostSuccess: 120,
-  priorityPenaltyFailure: 90,
-  priorityDecayRateHourly: 1,
+  priorityBoostSuccess: 1.2,
+  priorityPenaltyFailure: 0.9,
+  priorityDecayRateHourly: 0.01,
 };
 
 const ENV_OVERRIDES: Record<string, string> = {
@@ -78,18 +78,12 @@ export function loadConfigFromDb(db: Database.Database): void {
     const envKey = ENV_OVERRIDES[key];
     const envVal = envKey ? process.env[envKey] : undefined;
 
-    const isPercentField = key === 'priorityBoostSuccess' || key === 'priorityPenaltyFailure' || key === 'priorityDecayRateHourly';
-
     if (envVal !== undefined) {
       (_config as any)[key] = parseInt(envVal, 10) || defaultVal;
     } else if (settings[key] !== undefined) {
-      if (isPercentField) {
-        (_config as any)[key] = parseInt(settings[key], 10) / 100 || defaultVal / 100;
-      } else {
-        (_config as any)[key] = parseInt(settings[key], 10) || defaultVal;
-      }
+      (_config as any)[key] = parseInt(settings[key], 10) || defaultVal;
     } else {
-      (_config as any)[key] = isPercentField ? defaultVal / 100 : defaultVal;
+      (_config as any)[key] = defaultVal;
     }
   }
 }
