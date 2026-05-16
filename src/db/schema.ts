@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, integer, text, real, primaryKey } from 'drizzle-orm/sqlite-core';
 
 export const projects = sqliteTable('projects', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -36,6 +36,7 @@ export const edges = sqliteTable('edges', {
   title: text('title'),
   directionDescription: text('direction_description').notNull(),
   failureCount: integer('failure_count').notNull().default(0),
+  priority: real('priority').notNull().default(1.0),
   createdAt: text('created_at').notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.projectId, table.id] }),
