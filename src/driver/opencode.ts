@@ -1,5 +1,6 @@
 import type { AgentDriver, AgentOutput, ActResult, PlanOutput } from './types';
 import { execInContainer, writeFileInContainer, ensureWorkdir, readFileFromContainer } from '../docker/exec';
+import { config } from '../config';
 
 function parseJson(s: string): any | null {
   try { return JSON.parse(s.trim()); } catch {}
@@ -128,6 +129,16 @@ export class OpenCodeDriver implements AgentDriver {
     });
 
     const sessionId = findSessionId(result.stdout) || `fallback-${Date.now()}`;
+
+    await this.validateAndFix({
+      mode: 'act',
+      outputPath,
+      sessionId,
+      workdir: params.workdir,
+      timeout: params.timeout,
+      maxRetries: config.maxValidationRetries,
+    });
+
     const output = await this.tryReadOutputFile(outputPath);
     if (!output) {
       await writeFileInContainer(this.projectId,
