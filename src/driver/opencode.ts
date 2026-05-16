@@ -1,5 +1,6 @@
 import type { AgentDriver, AgentOutput, ActResult, PlanOutput } from './types';
 import { execInContainer, writeFileInContainer, ensureWorkdir, readFileFromContainer } from '../docker/exec';
+import { config } from '../config';
 
 function parseJson(s: string): any | null {
   try { return JSON.parse(s.trim()); } catch {}
@@ -35,6 +36,41 @@ export class OpenCodeDriver implements AgentDriver {
 
   private outputFileError(path: string): Error {
     return new Error(`Output file not found: ${path}. Model did not write results.`);
+  }
+
+  private async validateAndFix(params: {
+    mode: 'act' | 'plan';
+    outputPath: string;
+    sessionId: string | null;
+    workdir: string;
+    timeout: number;
+    maxRetries: number;
+  }): Promise<void> {
+    for (let attempt = 0; attempt <= params.maxRetries; attempt++) {
+      const result = await execInContainer(this.projectId, [
+        'node', '/usr/local/bin/validate-json', params.mode, params.outputPath
+      ], { workdir: params.workdir, timeout: 5000 });
+
+      if (result.exitCode === 0) return;
+
+      if (attempt >= params.maxRetries) {
+        throw new Error(`validate-json failed after ${params.maxRetries + 1} attempts: ${result.stderr}`);
+      }
+
+      const errorMsg = result.stderr || 'Validation failed';
+      const fixArgs = [
+        this.cliPath, 'run', '--format', 'json',
+        '--dangerously-skip-permissions', '--dir', params.workdir,
+        `validate-json 验证失败：\n${errorMsg}\n\n请修复 ${params.outputPath} 中的问题。`,
+      ];
+      if (params.sessionId) {
+        fixArgs.splice(3, 0, '--session', params.sessionId);
+      }
+      await execInContainer(this.projectId, fixArgs, {
+        workdir: params.workdir,
+        timeout: params.timeout,
+      });
+    }
   }
 
   async executePlan(params: {
