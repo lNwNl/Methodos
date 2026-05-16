@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { renderSnapshot } from '../snapshot/render';
 import { renderPlanPrompt } from '../prompt/plan';
 import { config } from '../config';
-import { getProject, hasUnresultedEdges, hasNewNodesSince, insertEdges, setProjectLastPlanAt, updateProject, incrementPlanRound } from '../db/operations';
+import { getProject, hasNewNodesSince, insertEdges, setProjectLastPlanAt, updateProject, incrementPlanRound } from '../db/operations';
 import type { AgentDriver, PlanOutput } from '../driver/types';
 import { z } from 'zod';
 
@@ -19,14 +19,23 @@ const planOutputSchema = z.object({
   evidence_node_ids: z.array(z.number()).optional(),
 });
 
-export function shouldTriggerPlan(db: Database.Database, projectId: number): boolean {
+export function shouldTriggerPlan(
+  db: Database.Database,
+  projectId: number,
+  lastPlanExecutedAt?: string,
+): boolean {
   const project = getProject(db, projectId);
   if (!project || project.status !== 'active') return false;
 
-  const unresulted = hasUnresultedEdges(db, projectId);
-  if (unresulted) return false;
-
   if (!project.last_plan_at) return true;
+
+  if (lastPlanExecutedAt) {
+    const lastExec = new Date(lastPlanExecutedAt).getTime();
+    const now = Date.now();
+    if (now - lastExec < config.planMinIntervalMs) {
+      return false;
+    }
+  }
 
   return hasNewNodesSince(db, projectId, project.last_plan_at);
 }

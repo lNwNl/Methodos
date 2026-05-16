@@ -13,6 +13,7 @@ interface LoopState {
   planInFlight: Set<number>;
   actsInFlight: Map<number, number>;
   drivers: Map<number, AgentDriver>;
+  lastPlanExecutedAt: Map<number, string>;
 }
 
 export type DriverFactory = (projectId: number, agentType: string) => AgentDriver;
@@ -23,6 +24,7 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
     planInFlight: new Set(),
     actsInFlight: new Map(),
     drivers: new Map(),
+    lastPlanExecutedAt: new Map(),
   };
 
   function getDriver(pid: number, agentType: string): AgentDriver {
@@ -41,13 +43,14 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
 
       if (state.planInFlight.has(pid)) continue;
 
-      if (shouldTriggerPlan(db, pid)) {
+      if (shouldTriggerPlan(db, pid, state.lastPlanExecutedAt.get(pid))) {
         state.planInFlight.add(pid);
         logger.info({ projectId: pid }, 'Triggering Plan');
 
         executePlan(db, pid, getDriver(pid, project.agent_type), ts).then((result) => {
           state.planInFlight.delete(pid);
           if (result.success) {
+            state.lastPlanExecutedAt.set(pid, new Date().toISOString());
             if (result.error) {
               logger.info({ projectId: pid, reason: result.error }, 'Plan 判定无法继续');
             } else {
