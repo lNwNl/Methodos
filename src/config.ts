@@ -10,6 +10,7 @@ const DEFAULTS: Record<string, number> = {
   maxActConcurrency: 3,
   snapshotMaxNodes: 100,
   snapshotMaxEdges: 200,
+  maxValidationRetries: 3,
 };
 
 const ENV_OVERRIDES: Record<string, string> = {
@@ -19,6 +20,7 @@ const ENV_OVERRIDES: Record<string, string> = {
   maxActConcurrency: 'MAX_ACT_CONCURRENCY',
   snapshotMaxNodes: 'SNAPSHOT_MAX_NODES',
   snapshotMaxEdges: 'SNAPSHOT_MAX_EDGES',
+  maxValidationRetries: 'MAX_VALIDATION_RETRIES',
 };
 
 interface Config {
@@ -33,6 +35,7 @@ interface Config {
   maxActConcurrency: number;
   snapshotMaxNodes: number;
   snapshotMaxEdges: number;
+  maxValidationRetries: number;
 }
 
 const _config: Config = {
@@ -51,6 +54,7 @@ const _config: Config = {
   maxActConcurrency: DEFAULTS.maxActConcurrency,
   snapshotMaxNodes: DEFAULTS.snapshotMaxNodes,
   snapshotMaxEdges: DEFAULTS.snapshotMaxEdges,
+  maxValidationRetries: DEFAULTS.maxValidationRetries,
 };
 
 export const config: Config = _config;
