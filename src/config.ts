@@ -11,6 +11,10 @@ const DEFAULTS: Record<string, number> = {
   snapshotMaxNodes: 100,
   snapshotMaxEdges: 200,
   maxValidationRetries: 3,
+  planMinIntervalMs: 5000,
+  priorityBoostSuccess: 120,
+  priorityPenaltyFailure: 90,
+  priorityDecayRateHourly: 1,
 };
 
 const ENV_OVERRIDES: Record<string, string> = {
@@ -36,6 +40,10 @@ interface Config {
   snapshotMaxNodes: number;
   snapshotMaxEdges: number;
   maxValidationRetries: number;
+  planMinIntervalMs: number;
+  priorityBoostSuccess: number;
+  priorityPenaltyFailure: number;
+  priorityDecayRateHourly: number;
 }
 
 const _config: Config = {
@@ -55,6 +63,10 @@ const _config: Config = {
   snapshotMaxNodes: DEFAULTS.snapshotMaxNodes,
   snapshotMaxEdges: DEFAULTS.snapshotMaxEdges,
   maxValidationRetries: DEFAULTS.maxValidationRetries,
+  planMinIntervalMs: DEFAULTS.planMinIntervalMs,
+  priorityBoostSuccess: DEFAULTS.priorityBoostSuccess,
+  priorityPenaltyFailure: DEFAULTS.priorityPenaltyFailure,
+  priorityDecayRateHourly: DEFAULTS.priorityDecayRateHourly,
 };
 
 export const config: Config = _config;
@@ -66,12 +78,18 @@ export function loadConfigFromDb(db: Database.Database): void {
     const envKey = ENV_OVERRIDES[key];
     const envVal = envKey ? process.env[envKey] : undefined;
 
+    const isPercentField = key === 'priorityBoostSuccess' || key === 'priorityPenaltyFailure' || key === 'priorityDecayRateHourly';
+
     if (envVal !== undefined) {
       (_config as any)[key] = parseInt(envVal, 10) || defaultVal;
     } else if (settings[key] !== undefined) {
-      (_config as any)[key] = parseInt(settings[key], 10) || defaultVal;
+      if (isPercentField) {
+        (_config as any)[key] = parseInt(settings[key], 10) / 100 || defaultVal / 100;
+      } else {
+        (_config as any)[key] = parseInt(settings[key], 10) || defaultVal;
+      }
     } else {
-      (_config as any)[key] = defaultVal;
+      (_config as any)[key] = isPercentField ? defaultVal / 100 : defaultVal;
     }
   }
 }

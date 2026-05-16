@@ -89,6 +89,10 @@ export function initDb() {
       maxActConcurrency: '3',
       snapshotMaxNodes: '100',
       snapshotMaxEdges: '200',
+      planMinIntervalMs: '5000',
+      priorityBoostSuccess: '120',
+      priorityPenaltyFailure: '90',
+      priorityDecayRateHourly: '1',
     };
     const insert = sqlite.prepare('INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)');
     const txn = sqlite.transaction(() => {
