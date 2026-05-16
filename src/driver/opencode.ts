@@ -1,6 +1,5 @@
 import type { AgentDriver, AgentOutput, ActResult, PlanOutput } from './types';
 import { execInContainer, writeFileInContainer, ensureWorkdir, readFileFromContainer } from '../docker/exec';
-import { config } from '../config';
 
 function parseJson(s: string): any | null {
   try { return JSON.parse(s.trim()); } catch {}
@@ -58,14 +57,13 @@ export class OpenCodeDriver implements AgentDriver {
       }
 
       const errorMsg = result.stderr || 'Validation failed';
+      const prompt = `validate-json 验证失败：\n${errorMsg}\n\n请修复 ${params.outputPath} 中的问题。`;
       const fixArgs = [
         this.cliPath, 'run', '--format', 'json',
         '--dangerously-skip-permissions', '--dir', params.workdir,
-        `validate-json 验证失败：\n${errorMsg}\n\n请修复 ${params.outputPath} 中的问题。`,
+        ...(params.sessionId ? ['--session', params.sessionId] : []),
+        prompt,
       ];
-      if (params.sessionId) {
-        fixArgs.splice(7, 0, '--session', params.sessionId);
-      }
       await execInContainer(this.projectId, fixArgs, {
         workdir: params.workdir,
         timeout: params.timeout,
