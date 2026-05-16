@@ -49,7 +49,7 @@ export function executePlan(
   const snapshot = renderSnapshot(db, projectId, {
     snapshotMaxNodes: config.snapshotMaxNodes,
     snapshotMaxEdges: config.snapshotMaxEdges,
-  });
+  }, 'plan');
 
   const round = incrementPlanRound(db, projectId);
   const prompt = renderPlanPrompt(snapshot, projectId, round);
