@@ -76,13 +76,13 @@ describe('renderSnapshot', () => {
     expect(snap.edges[0].to_node_ids).toEqual([2]);
   });
 
-  it('filters out unresulted edges', () => {
+  it('filters out unresulted edges in act mode', () => {
     insertEdges(db, projectId, [{ from_node_ids: [1], direction_description: 'scan' }], now);
     writeActResult(db, projectId, 1, null, 'Port 80 open', 'agent', '2026-05-14T00:01:00.000Z');
     insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'sql injection' }], '2026-05-14T00:02:00.000Z');
     insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'dir enum' }], '2026-05-14T00:03:00.000Z');
 
-    const snap = renderSnapshot(db, projectId, { snapshotMaxNodes: 100, snapshotMaxEdges: 200 });
+    const snap = renderSnapshot(db, projectId, { snapshotMaxNodes: 100, snapshotMaxEdges: 200 }, 'act');
     expect(snap.edges).toHaveLength(1);
     expect(snap.edges[0].direction_description).toBe('scan');
   });
@@ -103,5 +103,48 @@ describe('renderSnapshot', () => {
     expect(humanNode).toBeDefined();
 
     expect(snap.nodes.length).toBeLessThanOrEqual(6);
+  });
+
+  it('includes all edges in plan mode', () => {
+    insertEdges(db, projectId, [{ from_node_ids: [1], direction_description: 'scan' }], now);
+    writeActResult(db, projectId, 1, null, 'Port 80 open', 'agent', '2026-05-14T00:01:00.000Z');
+    insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'sql injection' }], '2026-05-14T00:02:00.000Z');
+    insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'dir enum' }], '2026-05-14T00:03:00.000Z');
+
+    const snap = renderSnapshot(db, projectId, { snapshotMaxNodes: 100, snapshotMaxEdges: 200 }, 'plan');
+    expect(snap.edges).toHaveLength(3);
+  });
+
+  it('includes only completed edges in act mode without claimed edge', () => {
+    insertEdges(db, projectId, [{ from_node_ids: [1], direction_description: 'scan' }], now);
+    writeActResult(db, projectId, 1, null, 'Port 80 open', 'agent', '2026-05-14T00:01:00.000Z');
+    insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'sql injection' }], '2026-05-14T00:02:00.000Z');
+    insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'dir enum' }], '2026-05-14T00:03:00.000Z');
+
+    const snap = renderSnapshot(db, projectId, { snapshotMaxNodes: 100, snapshotMaxEdges: 200 }, 'act');
+    expect(snap.edges).toHaveLength(1);
+    expect(snap.edges[0].direction_description).toBe('scan');
+  });
+
+  it('includes completed edges plus claimed edge in act mode', () => {
+    insertEdges(db, projectId, [{ from_node_ids: [1], direction_description: 'scan' }], now);
+    writeActResult(db, projectId, 1, null, 'Port 80 open', 'agent', '2026-05-14T00:01:00.000Z');
+    const [edgeId] = insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'sql injection' }], '2026-05-14T00:02:00.000Z');
+    insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'dir enum' }], '2026-05-14T00:03:00.000Z');
+
+    const snap = renderSnapshot(db, projectId, { snapshotMaxNodes: 100, snapshotMaxEdges: 200 }, 'act', edgeId);
+    expect(snap.edges).toHaveLength(2);
+    expect(snap.edges.some(e => e.direction_description === 'scan')).toBe(true);
+    expect(snap.edges.some(e => e.direction_description === 'sql injection')).toBe(true);
+  });
+
+  it('preserves source nodes for claimed edge in act mode during truncation', () => {
+    insertEdges(db, projectId, [{ from_node_ids: [1], direction_description: 'scan' }], now);
+    writeActResult(db, projectId, 1, null, 'Port 80 open', 'agent', '2026-05-14T00:01:00.000Z');
+    const [edgeId] = insertEdges(db, projectId, [{ from_node_ids: [2], direction_description: 'sql injection' }], '2026-05-14T00:02:00.000Z');
+
+    const snap = renderSnapshot(db, projectId, { snapshotMaxNodes: 2, snapshotMaxEdges: 200 }, 'act', edgeId);
+    const nodeIds = snap.nodes.map(n => n.id);
+    expect(nodeIds).toContain(2);
   });
 });

@@ -5,6 +5,8 @@ export function renderSnapshot(
   db: Database.Database,
   projectId: number,
   limits: { snapshotMaxNodes: number; snapshotMaxEdges: number },
+  mode: 'plan' | 'act' = 'plan',
+  claimedEdgeId?: number,
 ): Snapshot {
   const nodes = db.prepare(
     'SELECT id, title, description, created_by FROM nodes WHERE project_id = ? ORDER BY created_at ASC'
@@ -14,16 +16,31 @@ export function renderSnapshot(
     'SELECT id, from_node_ids, to_node_ids, title, direction_description, failure_count FROM edges WHERE project_id = ? ORDER BY created_at ASC'
   ).all(projectId) as any[];
 
-  const edges: SnapshotEdge[] = rawEdges
-    .map(e => ({
-      id: e.id,
-      from_node_ids: JSON.parse(e.from_node_ids),
-      to_node_ids: JSON.parse(e.to_node_ids),
-      title: e.title || null,
-      direction_description: e.direction_description,
-      failure_count: e.failure_count,
-    }))
-    .filter(e => e.to_node_ids.length > 0);
+  const allEdges: SnapshotEdge[] = rawEdges.map(e => ({
+    id: e.id,
+    from_node_ids: JSON.parse(e.from_node_ids),
+    to_node_ids: JSON.parse(e.to_node_ids),
+    title: e.title || null,
+    direction_description: e.direction_description,
+    failure_count: e.failure_count,
+  }));
+
+  let edges: SnapshotEdge[];
+  if (mode === 'plan') {
+    edges = allEdges;
+  } else {
+    const completedEdges = allEdges.filter(e => e.to_node_ids.length > 0);
+    if (claimedEdgeId) {
+      const claimedEdge = allEdges.find(e => e.id === claimedEdgeId);
+      if (claimedEdge) {
+        edges = [...completedEdges, claimedEdge];
+      } else {
+        edges = completedEdges;
+      }
+    } else {
+      edges = completedEdges;
+    }
+  }
 
   if (nodes.length <= limits.snapshotMaxNodes && edges.length <= limits.snapshotMaxEdges) {
     return { nodes, edges };
@@ -43,6 +60,15 @@ export function renderSnapshot(
     ...humanNodes.map(n => n.id),
     ...keptOtherNodes.map(n => n.id),
   ]);
+
+  if (mode === 'act' && claimedEdgeId) {
+    const claimedEdge = edges.find(e => e.id === claimedEdgeId);
+    if (claimedEdge) {
+      for (const nid of claimedEdge.from_node_ids) {
+        keptNodeIds.add(nid);
+      }
+    }
+  }
 
   // Filter edges: keep edges where all endpoints are kept
   let keptEdges = edges.filter(e => {
