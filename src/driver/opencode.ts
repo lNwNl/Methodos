@@ -95,6 +95,15 @@ export class OpenCodeDriver implements AgentDriver {
       timeout: params.timeout + 5000,
     });
 
+    await this.validateAndFix({
+      mode: 'plan',
+      outputPath,
+      sessionId: null,
+      workdir: params.workdir,
+      timeout: params.timeout,
+      maxRetries: config.maxValidationRetries,
+    });
+
     const output = await this.tryReadOutputFile(outputPath);
     if (!output) throw this.outputFileError(outputPath);
 
