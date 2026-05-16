@@ -21,7 +21,7 @@ function delay(ms: number) {
 describe('Executor Loop Integration', () => {
   it('completes a full Plan→Act→Plan→complete cycle', async () => {
     const db = createTestDb();
-    const driver = new MockAgentDriver();
+    const driver = new MockAgentDriver(1);
 
     driver.setScenario(1, [
       {

@@ -3,5 +3,6 @@ dist/
 data/
 *.db
 drizzle/
+.env
 .env.local
 .gitnexus

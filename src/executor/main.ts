@@ -15,7 +15,7 @@ const driverFactory = (projectId: number, agentType: string) => {
   if (agentType === 'opencode' && USE_DOCKER) {
     return new OpenCodeDriver(projectId);
   }
-  const driver = new MockAgentDriver();
+  const driver = new MockAgentDriver(projectId);
   driver.setScenario(projectId, [
     {
       edges: [

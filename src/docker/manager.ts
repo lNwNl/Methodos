@@ -10,7 +10,6 @@ const PODMAN = process.env.DOCKER_BIN || 'podman';
 function getOpenCodeBinds(): string[] {
   return [
     `${join(home, '.local/share/opencode')}:/root/.local/share/opencode`,
-    `${join(home, '.agents')}:/root/.agents:ro`,
   ];
 }
 
@@ -53,7 +52,7 @@ export async function ensureContainer(
       '--dns', '8.8.8.8',
       '--dns', '1.1.1.1',
       ...bindArgs,
-      '-w', '/home/kali/workspace',
+      '-w', '/root/workspace',
       imageTag, 'sleep', 'infinity',
     ], 120000);
 

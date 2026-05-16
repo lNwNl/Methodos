@@ -58,7 +58,13 @@ export class OpenCodeDriver implements AgentDriver {
       }
 
       const errorMsg = result.stderr || 'Validation failed';
-      const prompt = `validate-json 验证失败：\n${errorMsg}\n\n请修复 ${params.outputPath} 中的问题。`;
+      const isMissing = errorMsg.includes('cannot read file') || errorMsg.includes('file is empty');
+      const fmt = params.mode === 'plan'
+        ? `继续探索：{"edges":[{"from_node_ids":[1],"direction_description":"具体步骤"}],"complete":false}\n完成判定：{"edges":[],"complete":true,"summary":"完成原因","evidence_node_ids":[1]}`
+        : '{"title":"简短标题","description":"发现的事实总结"}';
+      const prompt = isMissing
+        ? `任务尚未完成：你还没有将探索结果写入 ${params.outputPath}。\n请根据已有的探索结果，使用 write 工具写入该文件。\n格式：${fmt}`
+        : `任务输出格式不正确：${params.outputPath} 验证失败 — ${errorMsg}\n请使用 write 工具修正该文件。\n格式：${fmt}`;
       const fixArgs = [
         this.cliPath, 'run', '--format', 'json',
         '--dangerously-skip-permissions', '--dir', params.workdir,
@@ -88,8 +94,7 @@ export class OpenCodeDriver implements AgentDriver {
     await execInContainer(this.projectId, [
       'timeout', String(timeoutSec),
       this.cliPath, 'run', '--format', 'json',  '--dangerously-skip-permissions', '--dir', params.workdir,
-      `Follow plan_prompt.md to write and validate plan_output_${params.round}.json, then stop.`,
-      '-f', promptPath,
+      '执行任务', '-f', promptPath,
     ], {
       workdir: params.workdir,
       timeout: params.timeout + 5000,
@@ -130,26 +135,35 @@ export class OpenCodeDriver implements AgentDriver {
     const result = await execInContainer(this.projectId, [
       'timeout', String(timeoutSec),
       this.cliPath, 'run', '--format', 'json',  '--dangerously-skip-permissions', '--dir', params.workdir,
-      'Follow act_prompt.md to write and validate act_output.json, then stop.',
-      '-f', promptPath,
+      '执行任务', '-f', promptPath,
     ], {
       workdir: params.workdir,
       timeout: params.timeout + 5000,
     });
 
     const sessionId = findSessionId(result.stdout) || `fallback-${Date.now()}`;
+    const timedOut = result.exitCode === 124 || result.exitCode === -1;
 
-    await this.validateAndFix({
-      mode: 'act',
-      outputPath,
-      sessionId,
-      workdir: params.workdir,
-      timeout: params.timeout,
-      maxRetries: config.maxValidationRetries,
-    });
+    if (!timedOut) {
+      await this.validateAndFix({
+        mode: 'act',
+        outputPath,
+        sessionId,
+        workdir: params.workdir,
+        timeout: params.timeout,
+        maxRetries: config.maxValidationRetries,
+      });
+    }
 
     const output = await this.tryReadOutputFile(outputPath);
     if (!output) {
+      if (timedOut) {
+        return {
+          output: { description: '任务超时，未产出结果' },
+          sessionId,
+          timedOut: true,
+        };
+      }
       await writeFileInContainer(this.projectId,
         `${params.workdir}/act_debug.log`,
         `exit=${result.exitCode}\n---stdout---\n${result.stdout}\n---stderr---\n${result.stderr}`,
@@ -160,7 +174,7 @@ export class OpenCodeDriver implements AgentDriver {
     return {
       output: { title: output.title, description: output.description || JSON.stringify(output) },
       sessionId,
-      timedOut: result.exitCode === 124 || result.exitCode === -1,
+      timedOut,
     };
   }
 
@@ -181,8 +195,7 @@ export class OpenCodeDriver implements AgentDriver {
       'timeout', String(timeoutSec),
       this.cliPath, 'run', '--format', 'json',  '--dangerously-skip-permissions', '--dir', params.workdir,
       '--session', params.sessionId,
-      '停止探索，总结已有成果。将结果写入 conclude_output.json，然后停止。',
-      '-f', promptPath,
+      '执行任务', '-f', promptPath,
     ], {
       workdir: params.workdir,
       timeout: params.timeout + 5000,

@@ -3,8 +3,10 @@ import type { AgentDriver, AgentOutput, ActResult, PlanOutput } from './types';
 export class MockAgentDriver implements AgentDriver {
   private planCounts = new Map<number, number>();
   private scenarios: Map<number, PlanOutput[]>;
+  private projectId: number;
 
-  constructor(scenarios?: Map<number, PlanOutput[]>) {
+  constructor(projectId: number = 0, scenarios?: Map<number, PlanOutput[]>) {
+    this.projectId = projectId;
     this.scenarios = scenarios || new Map();
   }
 
@@ -14,7 +16,7 @@ export class MockAgentDriver implements AgentDriver {
   }
 
   async executePlan(params: { prompt: string; workdir: string; timeout: number; round: number }): Promise<PlanOutput> {
-    const projectId = this.extractProjectId(params.prompt);
+    const projectId = this.projectId;
     const count = (this.planCounts.get(projectId) || 0) + 1;
     this.planCounts.set(projectId, count);
 
@@ -58,10 +60,5 @@ export class MockAgentDriver implements AgentDriver {
       title: '超时总结',
       description: '超时前部分结果：收集到部分信息',
     };
-  }
-
-  private extractProjectId(prompt: string): number {
-    const match = prompt.match(/项目\s*ID:\s*(\d+)/);
-    return match ? parseInt(match[1], 10) : 0;
   }
 }

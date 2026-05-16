@@ -34,8 +34,8 @@ export function executeAct(
     snapshotMaxEdges: config.snapshotMaxEdges,
   }, 'act', edge.id);
 
-  const workdir = `/home/kali/workspace/task_${edge.id}`;
-  const prompt = renderActPrompt(snapshot, edge.direction_description, workdir, projectId);
+  const workdir = `/root/workspace/task_${edge.id}`;
+  const prompt = renderActPrompt(snapshot, edge.direction_description, workdir);
 
   return driver.executeAct({
     prompt,

@@ -52,11 +52,11 @@ export function executePlan(
   }, 'plan');
 
   const round = incrementPlanRound(db, projectId);
-  const prompt = renderPlanPrompt(snapshot, projectId, round);
+  const prompt = renderPlanPrompt(snapshot, round);
 
   return driver.executePlan({
     prompt,
-    workdir: '/home/kali/workspace',
+    workdir: '/root/workspace',
     timeout: config.planTimeoutMs,
     round,
   }).then((output) => {

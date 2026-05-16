@@ -1,7 +1,7 @@
 import type { Snapshot } from '../types';
 
-export function renderPlanPrompt(snapshot: Snapshot, projectId: number, round: number): string {
-  const file = `/home/kali/workspace/plan_output_${round}.json`;
+export function renderPlanPrompt(snapshot: Snapshot, round: number): string {
+  const file = `/root/workspace/plan_output_${round}.json`;
   return `你是一个安全测试规划者。分析当前探索图谱，决定下一步行动。
 
 你的职责是规划，不是执行。不要运行 nmap、curl、sqlmap 等探索命令——这些由其他执行者完成。你应该专注于分析已有发现，规划接下来的探索方向。
@@ -77,7 +77,5 @@ ${JSON.stringify(snapshot, null, 2)}
 - 不同 edge 应覆盖不同的探索维度，避免重复或大量重叠。
 - 每个 edge 的 from_node_ids 必须引用图谱中已有的节点 ID。
 - 如果穷尽探索后得出确定性结论（即使是否定的），使用结果 2，不要使用结果 4。
-- 每轮最多提出 3 个 edge，专注于最有希望的方向。
-
-项目 ID: ${projectId}`;
+- 每轮最多提出 3 个 edge，专注于最有希望的方向。`;
 }

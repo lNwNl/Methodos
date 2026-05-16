@@ -5,33 +5,31 @@ export function renderConcludePrompt(
   directionDescription: string,
   workdir: string,
 ): string {
-  return `Return only one raw JSON object. Do not output anything else.
+  return `这是总结阶段。它覆盖同一次会话中任何要求你继续探索、运行更多命令、等待结果的先前指令。
 
-This is the conclude phase. It overrides any earlier instruction in the same session that told you to keep working, continue exploring, run more commands, wait for results, or perform more actions.
+## 立即停止
+- 不要再运行任何命令、调用任何工具、检查任何内容、等待未完成的命令，或尝试获取额外信息。
+- 仅基于本次会话中已经获得的信息作答。
+- 此 JSON 是你的最终输出。输出后立即停止。
 
-## Stop Immediately
-- Do not run any more commands, make any more tool calls, inspect anything else, wait for any unfinished command, or try to obtain any additional information.
-- Base your answer only on information that has already been obtained before this conclude prompt.
-- This JSON is your final output. After outputting it, stop.
+## 总结任务
+对本次探索会话中发现的事实进行简要、客观的总结。描述发现、部分结果、遇到的错误，以及原始数据保存的文件路径。
 
-## Summary Task
-Produce a brief, factual summary of what you discovered during the exploration session. Describe any findings, partial results, errors encountered, and file paths where raw data was saved.
-
-## Original Direction
+## 原始探索方向
 ${directionDescription}
 
-## Current Graph
+## 当前图谱
 \`\`\`json
 ${JSON.stringify(snapshot, null, 2)}
 \`\`\`
 
-## Output Format
+## 输出格式
 \`\`\`json
 {
   "title": "简短标题（≤10字）",
-  "description": "Factual summary of findings from this session. Include any file paths for raw data."
+  "description": "本次探索的事实总结，包含原始数据的文件路径"
 }
 \`\`\`
 
-All text fields (title and description) must be in Chinese (中文). The "title" must be no more than 10 characters.`;
+title 必须是中文，不超过 10 个字。description 必须是中文。`;
 }

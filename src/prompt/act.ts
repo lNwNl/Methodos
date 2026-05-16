@@ -4,7 +4,6 @@ export function renderActPrompt(
   snapshot: Snapshot,
   directionDescription: string,
   workdir: string,
-  projectId: number,
 ): string {
   const outputFile = `${workdir}/act_output.json`;
 
@@ -13,14 +12,13 @@ export function renderActPrompt(
 ## 任务
 ${directionDescription}
 
-使用 bash 和其他工具执行此探索。将原始输出保存到文件：${outputFile}
+使用 bash 和其他工具执行此探索。将工具输出中的重要信息保存到工作目录 ${workdir}/ 下的文件中，不需要保存所有原始输出，只保留有参考价值的内容。
 
 ## 网络请求控制
-你运行在共享环境中。违反以下规则会直接导致宿主机网络瘫痪，必须严格执行：
-- **严格串行**：同一时刻只能运行 1 个网络命令（nmap、curl、wget、whatweb、gobuster、dirsearch、sqlmap、nikto、hydra、ncat 等所有网络工具均适用）。一个命令完全结束（返回输出或超时退出）后，才能运行下一个。禁止用 &、&&、||、;、| 等方式串联或并行多个网络命令
-- **速率限制**：nmap 必须加 --min-rate=200 -T2，禁止使用 -T4、-T5 或 --min-rate=500 以上。其他扫描工具（gobuster、dirsearch、nikto 等）使用默认速率，禁止加 -t（线程数）或 --threads 参数提高并发
-- **单一目标**：每条 Act 只完成一个具体动作，例如"扫描端口"或"访问某个 URL"，不要在一个 Act 里串联多个探测步骤
-- **异常即停**：如果目标响应变慢、连接超时或出现大量失败，立即停止当前命令，不要重试
+遵守以下规则：
+- **并发限制**：所有网络扫描工具必须将并发数设为最低。nmap 使用 -T1 --max-rate=10 -n（每秒最多10个包，-n 禁止反向 DNS 解析以加快扫描速度）；gobuster、dirsearch、ffuf 等工具必须加 -t 1（线程数为1）；curl、wget 等HTTP工具禁止并行请求
+- **请求间隔**：每个网络请求之间必须间隔至少 2 秒。批量探测时主动 sleep 控制节奏
+- **异常降速**：如果目标响应变慢、连接超时或出现大量失败，等待 10-30 秒后以更低速率重试（如 nmap 降低 --max-rate，gobuster 使用 -t 1 基础上再加 --delay 等），不要直接放弃
 
 ## 输出格式
 无论探索成功或失败，都必须写入 ${outputFile}。使用 write 工具写入。
@@ -37,7 +35,5 @@ title 必须是中文，不超过 10 个字。description 必须是中文。
 ## 当前图谱
 \`\`\`json
 ${JSON.stringify(snapshot, null, 2)}
-\`\`\`
-
-项目 ID: ${projectId}`;
+\`\`\``;
 }
