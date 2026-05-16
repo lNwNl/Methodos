@@ -15,6 +15,8 @@ export function renderPlanPrompt(snapshot: Snapshot, projectId: number, round: n
 ${JSON.stringify(snapshot, null, 2)}
 \`\`\`
 
+**注意**：图谱中包含所有边，包括正在探索和待探索的边。请勿创建重复的探索方向。
+
 ## 决策规则
 从以下四种结果中选择且仅选择一种：
 
