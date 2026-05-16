@@ -3,7 +3,8 @@ import { renderSnapshot } from '../snapshot/render';
 import { renderActPrompt } from '../prompt/act';
 import { renderConcludePrompt } from '../prompt/conclude';
 import { config } from '../config';
-import { claimEdge, writeActResult, handleActFailure, countActiveActs } from '../db/operations';
+import { claimEdge, writeActResult, handleActFailure, countActiveActs, updateEdgePriority } from '../db/operations';
+import { calculateEdgePriority } from '../db/priority';
 import type { AgentDriver } from '../driver/types';
 import { z } from 'zod';
 
@@ -31,7 +32,7 @@ export function executeAct(
   const snapshot = renderSnapshot(db, projectId, {
     snapshotMaxNodes: config.snapshotMaxNodes,
     snapshotMaxEdges: config.snapshotMaxEdges,
-  });
+  }, 'act', edge.id);
 
   const workdir = `/home/kali/workspace/task_${edge.id}`;
   const prompt = renderActPrompt(snapshot, edge.direction_description, workdir, projectId);
@@ -61,11 +62,25 @@ export function executeAct(
     const parsed = agentOutputSchema.safeParse(output);
     if (!parsed.success) {
       handleActFailure(db, projectId, edge.id, config.maxFailures, ts);
+
+      const newPriority = calculateEdgePriority(
+        { priority: edge.priority, failureCount: edge.failure_count + 1, createdAt: edge.created_at },
+        'failure'
+      );
+      updateEdgePriority(db, projectId, edge.id, newPriority);
+
       return { success: false, edgeId: edge.id, error: `Invalid output: ${parsed.error.message}` };
     }
 
     try {
       writeActResult(db, projectId, edge.id, parsed.data.title || null, parsed.data.description, 'agent', ts);
+
+      const newPriority = calculateEdgePriority(
+        { priority: edge.priority, failureCount: edge.failure_count, createdAt: edge.created_at },
+        'success'
+      );
+      updateEdgePriority(db, projectId, edge.id, newPriority);
+
       return { success: true, edgeId: edge.id };
     } catch (err: any) {
       return { success: false, edgeId: edge.id, error: err.message };
@@ -73,6 +88,13 @@ export function executeAct(
   }).catch((err) => {
     const ts = new Date().toISOString();
     handleActFailure(db, projectId, edge.id, config.maxFailures, ts);
+
+    const newPriority = calculateEdgePriority(
+      { priority: edge.priority, failureCount: edge.failure_count + 1, createdAt: edge.created_at },
+      'failure'
+    );
+    updateEdgePriority(db, projectId, edge.id, newPriority);
+
     return { success: false, edgeId: edge.id, error: err.message };
   });
 }
