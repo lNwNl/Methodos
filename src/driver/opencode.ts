@@ -64,7 +64,7 @@ export class OpenCodeDriver implements AgentDriver {
         `validate-json 验证失败：\n${errorMsg}\n\n请修复 ${params.outputPath} 中的问题。`,
       ];
       if (params.sessionId) {
-        fixArgs.splice(3, 0, '--session', params.sessionId);
+        fixArgs.splice(7, 0, '--session', params.sessionId);
       }
       await execInContainer(this.projectId, fixArgs, {
         workdir: params.workdir,
