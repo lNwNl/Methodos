@@ -39,6 +39,7 @@ function createTestDb() {
       title TEXT,
       direction_description TEXT NOT NULL,
       failure_count INTEGER NOT NULL DEFAULT 0,
+      priority REAL NOT NULL DEFAULT 1.0,
       created_at TEXT NOT NULL,
       PRIMARY KEY (project_id, id)
     );

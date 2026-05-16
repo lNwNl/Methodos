@@ -14,6 +14,8 @@ import {
   hasUnresultedEdges,
   hasNewNodesSince,
   getSnapshotData,
+  updateEdgePriority,
+  getEdge,
 } from './operations';
 
 function createTestDb() {
@@ -53,6 +55,7 @@ function createTestDb() {
       title TEXT,
       direction_description TEXT NOT NULL,
       failure_count INTEGER NOT NULL DEFAULT 0,
+      priority REAL NOT NULL DEFAULT 1.0,
       created_at TEXT NOT NULL,
       PRIMARY KEY (project_id, id)
     );
@@ -179,5 +182,92 @@ describe('operations', () => {
 
     insertNode(db, projectId, null, 'new finding', 'agent', null, t2);
     expect(hasNewNodesSince(db, projectId, t1)).toBe(true);
+  });
+
+  it('insertEdges sets priority to 1.0 by default', () => {
+    const now = new Date().toISOString();
+    const projectId = createProject(db, 'test', 'mock', 'mock:v1', now);
+
+    const ids = insertEdges(db, projectId, [
+      { from_node_ids: [1], direction_description: 'scan ports' },
+    ], now);
+
+    const edge = db.prepare('SELECT * FROM edges WHERE project_id = ? AND id = ?').get(projectId, ids[0]) as any;
+    expect(edge.priority).toBe(1.0);
+  });
+
+  it('claimEdge orders by priority DESC then created_at ASC', () => {
+    const now = new Date().toISOString();
+    const projectId = createProject(db, 'test', 'mock', 'mock:v1', now);
+
+    const ids = insertEdges(db, projectId, [
+      { from_node_ids: [1], direction_description: 'low priority' },
+      { from_node_ids: [1], direction_description: 'high priority' },
+      { from_node_ids: [1], direction_description: 'medium priority' },
+    ], now);
+
+    updateEdgePriority(db, projectId, ids[0], 0.5);
+    updateEdgePriority(db, projectId, ids[1], 2.0);
+    updateEdgePriority(db, projectId, ids[2], 1.0);
+
+    const claimed1 = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
+    expect(claimed1).not.toBeNull();
+    expect(claimed1!.id).toBe(ids[1]);
+    expect(claimed1!.priority).toBe(2.0);
+
+    const claimed2 = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
+    expect(claimed2).not.toBeNull();
+    expect(claimed2!.id).toBe(ids[2]);
+
+    const claimed3 = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
+    expect(claimed3).not.toBeNull();
+    expect(claimed3!.id).toBe(ids[0]);
+  });
+
+  it('updateEdgePriority updates priority value', () => {
+    const now = new Date().toISOString();
+    const projectId = createProject(db, 'test', 'mock', 'mock:v1', now);
+
+    const ids = insertEdges(db, projectId, [
+      { from_node_ids: [1], direction_description: 'scan' },
+    ], now);
+
+    const edgeBefore = getEdge(db, projectId, ids[0]);
+    expect(edgeBefore!.priority).toBe(1.0);
+
+    updateEdgePriority(db, projectId, ids[0], 2.5);
+
+    const edgeAfter = getEdge(db, projectId, ids[0]);
+    expect(edgeAfter!.priority).toBe(2.5);
+  });
+
+  it('getEdge returns null for non-existent edge', () => {
+    const now = new Date().toISOString();
+    const projectId = createProject(db, 'test', 'mock', 'mock:v1', now);
+
+    const result = getEdge(db, projectId, 999);
+    expect(result).toBeNull();
+  });
+
+  it('getEdge returns edge with all fields', () => {
+    const now = new Date().toISOString();
+    const projectId = createProject(db, 'test', 'mock', 'mock:v1', now);
+
+    const ids = insertEdges(db, projectId, [
+      { from_node_ids: [1], title: 'test edge', direction_description: 'scan' },
+    ], now);
+
+    const edge = getEdge(db, projectId, ids[0]);
+    expect(edge).not.toBeNull();
+    expect(edge!.id).toBe(ids[0]);
+    expect(edge!.project_id).toBe(projectId);
+    expect(edge!.from_node_ids).toEqual([1]);
+    expect(edge!.to_node_ids).toEqual([]);
+    expect(edge!.claimed_at).toBeNull();
+    expect(edge!.title).toBe('test edge');
+    expect(edge!.direction_description).toBe('scan');
+    expect(edge!.failure_count).toBe(0);
+    expect(edge!.priority).toBe(1.0);
+    expect(edge!.created_at).toBe(now);
   });
 });

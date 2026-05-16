@@ -75,8 +75,8 @@ export function insertEdges(
   for (const edge of edges) {
     const id = nextEdgeId(db, projectId);
     db.prepare(`
-      INSERT INTO edges (project_id, id, from_node_ids, to_node_ids, title, direction_description, created_at)
-      VALUES (?, ?, ?, '[]', ?, ?, ?)
+      INSERT INTO edges (project_id, id, from_node_ids, to_node_ids, title, direction_description, priority, created_at)
+      VALUES (?, ?, ?, '[]', ?, ?, 1.0, ?)
     `).run(projectId, id, JSON.stringify(edge.from_node_ids), edge.title || null, edge.direction_description, ts);
     ids.push(id);
   }
@@ -97,6 +97,7 @@ export function claimEdge(
       SELECT id FROM edges
       WHERE project_id = ? AND to_node_ids = '[]' AND failure_count < ?
         AND (claimed_at IS NULL OR claimed_at < ?)
+      ORDER BY priority DESC, created_at ASC
       LIMIT 1
     )
     RETURNING *
@@ -113,6 +114,43 @@ export function claimEdge(
     title: row.title,
     direction_description: row.direction_description,
     failure_count: row.failure_count,
+    priority: row.priority,
+    created_at: row.created_at,
+  };
+}
+
+export function updateEdgePriority(
+  db: Database.Database,
+  projectId: number,
+  edgeId: number,
+  priority: number,
+): void {
+  db.prepare(`
+    UPDATE edges SET priority = ? WHERE project_id = ? AND id = ?
+  `).run(priority, projectId, edgeId);
+}
+
+export function getEdge(
+  db: Database.Database,
+  projectId: number,
+  edgeId: number,
+) {
+  const row = db.prepare(
+    'SELECT * FROM edges WHERE project_id = ? AND id = ?'
+  ).get(projectId, edgeId) as any;
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    project_id: row.project_id,
+    from_node_ids: JSON.parse(row.from_node_ids),
+    to_node_ids: JSON.parse(row.to_node_ids),
+    claimed_at: row.claimed_at,
+    title: row.title,
+    direction_description: row.direction_description,
+    failure_count: row.failure_count,
+    priority: row.priority,
     created_at: row.created_at,
   };
 }
