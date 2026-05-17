@@ -682,27 +682,103 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
     }
 
     const edgeTimings = Vue.computed(function() { return computeEdgeTimings(); });
-    const edgeTimingsMax = Vue.computed(function() {
-      var arr = edgeTimings.value;
-      if (!arr.length) return 1;
-      var max = 0;
-      for (var i = 0; i < arr.length; i++) { if (arr[i].totalMs > max) max = arr[i].totalMs; }
-      return max > 0 ? max : 1;
-    });
     const edgeTimingsDone = Vue.computed(function() {
       return edgeTimings.value.filter(function(t) { return t.completed; }).length;
     });
-    const edgeTimingsAvgExec = Vue.computed(function() {
-      var done = edgeTimings.value.filter(function(t) { return t.completed && t.execMs > 0; });
-      if (!done.length) return '-';
-      var sum = 0;
-      for (var i = 0; i < done.length; i++) sum += done[i].execMs;
-      return formatDuration(sum / done.length);
-    });
 
-    function barWidth(ms) {
-      return (ms / edgeTimingsMax.value * 100) + '%';
+    function buildTimeline() {
+      var p = project.value;
+      if (!p) return [];
+      var projStart = p.created_at ? new Date(p.created_at).getTime() : 0;
+      if (!projStart) return [];
+
+      var nodeMap = new Map();
+      for (var i = 0; i < p.nodes.length; i++) nodeMap.set(p.nodes[i].id, p.nodes[i]);
+
+      var items = [];
+
+      // Plan rounds: infer from edge creation batches
+      var edgeGroups = [];
+      for (var i = 0; i < p.edges.length; i++) {
+        var e = p.edges[i];
+        var t = e.created_at ? new Date(e.created_at).getTime() : 0;
+        if (!t) continue;
+        var placed = false;
+        for (var j = 0; j < edgeGroups.length; j++) {
+          if (Math.abs(t - edgeGroups[j].time) < 2000) {
+            edgeGroups[j].time = Math.max(edgeGroups[j].time, t);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) edgeGroups.push({ time: t });
+      }
+
+      // Plan timing from DB (latest round)
+      var planDbStart = p.plan_started_at ? new Date(p.plan_started_at).getTime() : 0;
+      var planDbEnd = p.plan_completed_at ? new Date(p.plan_completed_at).getTime() : 0;
+
+      for (var i = 0; i < edgeGroups.length; i++) {
+        var planStart, planEnd;
+        if (i === edgeGroups.length - 1 && planDbStart && planDbEnd) {
+          planStart = planDbStart;
+          planEnd = planDbEnd;
+        } else {
+          planEnd = edgeGroups[i].time;
+          planStart = i === 0 ? projStart : edgeGroups[i - 1].time;
+        }
+        items.push({
+          type: 'plan',
+          round: i + 1,
+          id: null,
+          startMs: planStart - projStart,
+          durationMs: Math.max(planEnd - planStart, 0),
+          status: 'done',
+        });
+      }
+
+      // Acts
+      for (var i = 0; i < p.edges.length; i++) {
+        var e = p.edges[i];
+        var claimed = e.claimed_at ? new Date(e.claimed_at).getTime() : 0;
+        if (!claimed) continue;
+
+        var actEnd = 0;
+        var status = 'running';
+        if (e.to_node_ids.length > 0) {
+          var rn = nodeMap.get(e.to_node_ids[0]);
+          if (rn) {
+            actEnd = new Date(rn.created_at).getTime();
+            status = 'done';
+          }
+        }
+        if (!actEnd) actEnd = Date.now();
+
+        items.push({
+          type: 'act',
+          round: null,
+          id: e.id,
+          startMs: claimed - projStart,
+          durationMs: Math.max(actEnd - claimed, 0),
+          status: status,
+        });
+      }
+
+      items.sort(function(a, b) { return a.startMs - b.startMs; });
+      return items;
     }
+
+    var timeline = Vue.computed(function() { return buildTimeline(); });
+    var timelineMax = Vue.computed(function() {
+      var arr = timeline.value;
+      if (!arr.length) return 1;
+      var max = 0;
+      for (var i = 0; i < arr.length; i++) {
+        var end = arr[i].startMs + arr[i].durationMs;
+        if (end > max) max = end;
+      }
+      return max > 0 ? max : 1;
+    });
 
     function buildLog() {
       const p = project.value;
@@ -822,7 +898,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
     return {
       project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, panelTab, LAYOUT_NAMES, graphReady,
       latestReport, reportGenerating,
-      edgeTimings, edgeTimingsMax, edgeTimingsDone, edgeTimingsAvgExec, barWidth,
+      edgeTimings, edgeTimingsDone, timeline, timelineMax,
       stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, formatTime, formatDuration, evidenceNodesDesc, buildLog, selectLogEntry, computeEdgeTimings,
       startPanelResize, setLayout, toggleTheme, generateReport,
     };
@@ -1018,53 +1094,36 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
           </template>
 
           <template v-if="panelTab === 'timing'">
-            <template v-if="edgeTimings.length">
-              <div class="timing-summary">
-                <div class="timing-summary-item">
-                  <span class="timing-summary-label">项目总耗时</span>
-                  <span class="timing-summary-value">{{ formatDuration(project.updated_at && project.created_at ? new Date(project.updated_at) - new Date(project.created_at) : 0) }}</span>
-                </div>
-                <div class="timing-summary-item">
-                  <span class="timing-summary-label">最近 Plan 耗时</span>
-                  <span class="timing-summary-value">{{ project.plan_started_at && project.plan_completed_at ? formatDuration(new Date(project.plan_completed_at) - new Date(project.plan_started_at)) : '—' }}</span>
-                </div>
-                <div class="timing-summary-item">
-                  <span class="timing-summary-label">Plan 轮次</span>
-                  <span class="timing-summary-value">{{ project.plan_round || 0 }}</span>
-                </div>
-                <div class="timing-summary-item">
-                  <span class="timing-summary-label">已完成 / 总边数</span>
-                  <span class="timing-summary-value">{{ edgeTimingsDone }} / {{ edgeTimings.length }}</span>
+            <template v-if="timeline.length">
+              <div class="tl-header">
+                <span class="tl-header-item">项目 <b>{{ formatDuration(project.updated_at && project.created_at ? new Date(project.updated_at) - new Date(project.created_at) : 0) }}</b></span>
+                <span class="tl-header-item">Plan <b>{{ project.plan_round || 0 }} 轮</b></span>
+                <span class="tl-header-item">完成 <b>{{ edgeTimingsDone }}/{{ edgeTimings.length }}</b></span>
+              </div>
+              <div class="tl-ruler">
+                <span>0</span>
+                <span>{{ formatDuration(timelineMax / 2) }}</span>
+                <span>{{ formatDuration(timelineMax) }}</span>
+              </div>
+              <div class="tl-list">
+                <div v-for="(item, idx) in timeline" :key="item.type + '_' + (item.id || item.round) + '_' + idx" class="tl-row">
+                  <div class="tl-label">
+                    <span v-if="item.type === 'plan'" class="tl-tag tl-tag-plan">Plan</span>
+                    <span v-else class="tl-tag tl-tag-act">Act</span>
+                    <span class="tl-name">{{ item.type === 'plan' ? '第 ' + item.round + ' 轮' : 'Edge ' + item.id }}</span>
+                  </div>
+                  <div class="tl-bar-track">
+                    <div class="tl-bar-spacer" :style="{ flex: item.startMs }"></div>
+                    <div :class="['tl-bar', item.type === 'plan' ? 'tl-bar-plan' : (item.status === 'done' ? 'tl-bar-act-done' : 'tl-bar-act-running')]" :style="{ flex: Math.max(item.durationMs, timelineMax * 0.005) }"></div>
+                    <div class="tl-bar-spacer" :style="{ flex: Math.max(timelineMax - item.startMs - item.durationMs, 0) }"></div>
+                  </div>
+                  <div class="tl-time">{{ formatDuration(item.durationMs) || '<1s' }}</div>
                 </div>
               </div>
-              <table class="timing-table">
-                <thead>
-                  <tr>
-                    <th>Edge</th>
-                    <th>排队</th>
-                    <th>执行</th>
-                    <th>总计</th>
-                    <th style="width:40%">占比</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="t in edgeTimings" :key="t.edgeId" :class="{ 'timing-row-done': t.completed }">
-                    <td class="timing-td-id">{{ t.edgeId }}</td>
-                    <td class="timing-td-val">{{ formatDuration(t.waitMs) || '—' }}</td>
-                    <td class="timing-td-val">{{ t.completed && t.execMs === 0 ? '<1s' : formatDuration(t.execMs) || '—' }}</td>
-                    <td class="timing-td-val timing-td-total">{{ formatDuration(t.totalMs) || '—' }}</td>
-                    <td>
-                      <div class="timing-bar-track">
-                        <div class="timing-bar-wait" :style="{ width: t.totalMs > 0 ? barWidth(t.waitMs) : '0%' }"></div>
-                        <div class="timing-bar-exec" :style="{ width: t.totalMs > 0 ? barWidth(t.execMs) : '0%' }"></div>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <div class="timing-legend">
-                <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-wait"></span>排队（Plan 创建 → Agent 接手）</span>
-                <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-exec"></span>执行（Agent 接手 → 产出结果）</span>
+              <div class="tl-legend">
+                <span class="tl-legend-item"><span class="tl-legend-dot tl-bar-plan"></span>Plan</span>
+                <span class="tl-legend-item"><span class="tl-legend-dot tl-bar-act-done"></span>已完成</span>
+                <span class="tl-legend-item"><span class="tl-legend-dot tl-bar-act-running"></span>进行中</span>
               </div>
             </template>
             <div v-else class="timing-empty">暂无耗时数据</div>
