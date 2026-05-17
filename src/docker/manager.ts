@@ -1,11 +1,10 @@
-import { getContainerName } from './index';
+import { getContainerName, PODMAN } from './index';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 
 const home = homedir();
-const PODMAN = process.env.DOCKER_BIN || 'podman';
 
 function getOpenCodeBinds(): string[] {
   return [
@@ -76,11 +75,14 @@ async function injectOpencodeConfig(containerName: string): Promise<void> {
   // Add terminal MCP (no host plugins needed)
   merged.mcp.terminal = { type: 'local', command: ['uvx', 'terminal-mcp'] };
 
-  return new Promise<void>((resolve) => {
+  return new Promise<void>((resolve, reject) => {
     const child = execFile(PODMAN, [
       'exec', '-i', containerName,
       'tee', '/root/.config/opencode/opencode.json',
-    ], { timeout: 10000 }, () => resolve());
+    ], { timeout: 10000 }, (err) => {
+      if (err) { reject(err); return; }
+      resolve();
+    });
     child.stdin?.write(JSON.stringify(merged, null, 2));
     child.stdin?.end();
   });

@@ -44,15 +44,15 @@ export function executePlan(
   db: Database.Database,
   projectId: number,
   driver: AgentDriver,
-  _ts: string,
-): Promise<{ success: boolean; error?: string }> {
+  ts: string,
+): Promise<{ success: boolean; error?: string; logLevel?: string }> {
   const snapshot = renderSnapshot(db, projectId, {
     snapshotMaxNodes: config.snapshotMaxNodes,
     snapshotMaxEdges: config.snapshotMaxEdges,
   }, 'plan');
 
   const round = incrementPlanRound(db, projectId);
-  const prompt = renderPlanPrompt(snapshot, round);
+  const prompt = renderPlanPrompt(snapshot, round, '/root/workspace');
 
   return driver.executePlan({
     prompt,
@@ -60,10 +60,8 @@ export function executePlan(
     timeout: config.planTimeoutMs,
     round,
   }).then((output) => {
-    const ts = new Date().toISOString();
     return writePlan(db, projectId, output, ts);
   }).catch((err) => {
-    const ts = new Date().toISOString();
     const diag = (err as any).diag;
     const cat = diag?.category || 'unknown';
     // llm_transient is expected and auto-retried — use info level

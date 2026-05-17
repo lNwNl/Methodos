@@ -26,12 +26,13 @@ export function renderSnapshot(
   }));
 
   let edges: SnapshotEdge[];
+  let claimedEdge: SnapshotEdge | undefined;
   if (mode === 'plan') {
     edges = allEdges;
   } else {
     const completedEdges = allEdges.filter(e => e.to_node_ids.length > 0);
     if (claimedEdgeId) {
-      const claimedEdge = allEdges.find(e => e.id === claimedEdgeId);
+      claimedEdge = allEdges.find(e => e.id === claimedEdgeId);
       if (claimedEdge) {
         edges = [...completedEdges, claimedEdge];
       } else {
@@ -61,12 +62,9 @@ export function renderSnapshot(
     ...keptOtherNodes.map(n => n.id),
   ]);
 
-  if (mode === 'act' && claimedEdgeId) {
-    const claimedEdge = edges.find(e => e.id === claimedEdgeId);
-    if (claimedEdge) {
-      for (const nid of claimedEdge.from_node_ids) {
-        keptNodeIds.add(nid);
-      }
+  if (mode === 'act' && claimedEdge) {
+    for (const nid of claimedEdge.from_node_ids) {
+      keptNodeIds.add(nid);
     }
   }
 

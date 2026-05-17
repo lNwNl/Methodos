@@ -1,11 +1,12 @@
 import type { Snapshot } from '../types';
+import { ACT_OUTPUT_FILE } from '../constants';
 
 export function renderActPrompt(
   snapshot: Snapshot,
   directionDescription: string,
   workdir: string,
 ): string {
-  const outputFile = `${workdir}/act_output.json`;
+  const outputFile = `${workdir}/${ACT_OUTPUT_FILE}`;
 
   return `你是一个安全测试执行者。你的唯一任务是完成下面指定的探索方向。
 

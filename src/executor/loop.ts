@@ -3,6 +3,7 @@ import type { AgentDriver } from '../driver/types';
 import { getActiveProjects, hasUnresultedEdges, getProject } from '../db/operations';
 import { shouldTriggerPlan, executePlan } from './plan-exec';
 import { canExecuteAct, executeAct } from './act-exec';
+import { ensureContainer } from '../docker/manager';
 import { config } from '../config';
 import pino from 'pino';
 
@@ -43,6 +44,15 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
 
       if (state.planInFlight.has(pid)) continue;
 
+      if (project.agent_type === 'opencode') {
+        try {
+          await ensureContainer(pid, project.image_tag);
+        } catch (err: any) {
+          logger.warn({ projectId: pid, error: err.message }, 'Container not ready, skipping tick');
+          continue;
+        }
+      }
+
       if (shouldTriggerPlan(db, pid, state.lastPlanExecutedAt.get(pid))) {
         state.planInFlight.add(pid);
         logger.info({ projectId: pid }, 'Triggering Plan');
@@ -57,9 +67,12 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
               logger.info({ projectId: pid }, 'Plan completed successfully');
             }
           } else {
-            const level = (result as any).logLevel === 'warn' ? 'warn' : 'error';
+            const level = result.logLevel === 'warn' ? 'warn' : 'error';
             logger[level]({ projectId: pid, error: result.error }, 'Plan failed');
           }
+        }).catch((err) => {
+          state.planInFlight.delete(pid);
+          logger.error({ projectId: pid, err }, 'Plan execution threw');
         });
         continue;
       }
@@ -81,6 +94,14 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
           } else if (result.error !== 'No unclaimed edge') {
             logger.warn({ projectId: pid, edgeId: result.edgeId, error: result.error }, 'Act failed');
           }
+        }).catch((err) => {
+          const current = state.actsInFlight.get(pid) || 1;
+          if (current <= 1) {
+            state.actsInFlight.delete(pid);
+          } else {
+            state.actsInFlight.set(pid, current - 1);
+          }
+          logger.error({ projectId: pid, err }, 'Act execution threw');
         });
       }
     }

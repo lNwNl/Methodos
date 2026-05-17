@@ -13,20 +13,45 @@ const agentOutputSchema = z.object({
   description: z.string(),
 });
 
+function recalcEdgePriority(
+  db: Database.Database,
+  projectId: number,
+  edge: { id: number; priority: number; failure_count: number; created_at: string },
+  outcome: 'success' | 'failure',
+): void {
+  const newPriority = calculateEdgePriority(
+    { priority: edge.priority, failureCount: edge.failure_count + (outcome === 'failure' ? 1 : 0), createdAt: edge.created_at },
+    outcome,
+  );
+  updateEdgePriority(db, projectId, edge.id, newPriority);
+}
+
+function handleActFailureWithPriority(
+  db: Database.Database,
+  projectId: number,
+  edge: { id: number; priority: number; failure_count: number; created_at: string },
+  ts: string,
+  error: string,
+): { success: false; edgeId: number; error: string } {
+  handleActFailure(db, projectId, edge.id, config.maxFailures, ts);
+  recalcEdgePriority(db, projectId, edge, 'failure');
+  return { success: false, edgeId: edge.id, error };
+}
+
 export function canExecuteAct(db: Database.Database, projectId: number): boolean {
   const active = countActiveActs(db, projectId);
   return active < config.maxActConcurrency;
 }
 
-export function executeAct(
+export async function executeAct(
   db: Database.Database,
   projectId: number,
   driver: AgentDriver,
-  _ts: string,
+  ts: string,
 ): Promise<{ success: boolean; edgeId?: number; error?: string }> {
-  const edge = claimEdge(db, projectId, config.maxFailures, config.claimedExpiryMs, new Date().toISOString());
+  const edge = claimEdge(db, projectId, config.maxFailures, config.claimedExpiryMs, ts);
   if (!edge) {
-    return Promise.resolve({ success: false, edgeId: undefined, error: 'No unclaimed edge' });
+    return { success: false, edgeId: undefined, error: 'No unclaimed edge' };
   }
 
   const snapshot = renderSnapshot(db, projectId, {
@@ -37,64 +62,43 @@ export function executeAct(
   const workdir = `/root/workspace/task_${edge.id}`;
   const prompt = renderActPrompt(snapshot, edge.direction_description, workdir);
 
-  return driver.executeAct({
-    prompt,
-    workdir,
-    timeout: config.actTimeoutMs,
-  }).then(async (result) => {
-    // If timed out, attempt conclude phase first
-    let output = result.output;
-    if (result.timedOut && result.sessionId) {
-      const concludePrompt = renderConcludePrompt(snapshot, edge.direction_description, workdir);
-      try {
-        output = await driver.conclude({
-          sessionId: result.sessionId,
-          prompt: concludePrompt,
-          workdir,
-          timeout: config.actTimeoutMs,
-        });
-      } catch {
-        // Conclude failed too, use whatever output we have from the primary phase
-      }
-    }
+  let result;
+  try {
+    result = await driver.executeAct({
+      prompt,
+      workdir,
+      timeout: config.actTimeoutMs,
+    });
+  } catch (err: any) {
+    return handleActFailureWithPriority(db, projectId, edge, ts, err.message);
+  }
 
-    const ts = new Date().toISOString();
-    const parsed = agentOutputSchema.safeParse(output);
-    if (!parsed.success) {
-      handleActFailure(db, projectId, edge.id, config.maxFailures, ts);
-
-      const newPriority = calculateEdgePriority(
-        { priority: edge.priority, failureCount: edge.failure_count + 1, createdAt: edge.created_at },
-        'failure'
-      );
-      updateEdgePriority(db, projectId, edge.id, newPriority);
-
-      return { success: false, edgeId: edge.id, error: `Invalid output: ${parsed.error.message}` };
-    }
-
+  // If timed out, attempt conclude phase first
+  let output = result.output;
+  if (result.timedOut && result.sessionId) {
+    const concludePrompt = renderConcludePrompt(snapshot, edge.direction_description, workdir);
     try {
-      writeActResult(db, projectId, edge.id, parsed.data.title || null, parsed.data.description, 'agent', ts);
-
-      const newPriority = calculateEdgePriority(
-        { priority: edge.priority, failureCount: edge.failure_count, createdAt: edge.created_at },
-        'success'
-      );
-      updateEdgePriority(db, projectId, edge.id, newPriority);
-
-      return { success: true, edgeId: edge.id };
-    } catch (err: any) {
-      return { success: false, edgeId: edge.id, error: err.message };
+      output = await driver.conclude({
+        sessionId: result.sessionId,
+        prompt: concludePrompt,
+        workdir,
+        timeout: config.concludeTimeoutMs,
+      });
+    } catch {
+      // Conclude failed too, use whatever output we have from the primary phase
     }
-  }).catch((err) => {
-    const ts = new Date().toISOString();
-    handleActFailure(db, projectId, edge.id, config.maxFailures, ts);
+  }
 
-    const newPriority = calculateEdgePriority(
-      { priority: edge.priority, failureCount: edge.failure_count + 1, createdAt: edge.created_at },
-      'failure'
-    );
-    updateEdgePriority(db, projectId, edge.id, newPriority);
+  const parsed = agentOutputSchema.safeParse(output);
+  if (!parsed.success) {
+    return handleActFailureWithPriority(db, projectId, edge, ts, `Invalid output: ${parsed.error.message}`);
+  }
 
+  try {
+    writeActResult(db, projectId, edge.id, parsed.data.title || null, parsed.data.description, 'agent', ts);
+    recalcEdgePriority(db, projectId, edge, 'success');
+    return { success: true, edgeId: edge.id };
+  } catch (err: any) {
     return { success: false, edgeId: edge.id, error: err.message };
-  });
+  }
 }

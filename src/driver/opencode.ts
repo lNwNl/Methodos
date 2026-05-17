@@ -1,6 +1,7 @@
 import type { AgentDriver, AgentOutput, ActResult, PlanOutput } from './types';
 import { execInContainer, writeFileInContainer, ensureWorkdir, readFileFromContainer } from '../docker/exec';
 import { config } from '../config';
+import { ACT_OUTPUT_FILE, planOutputFile } from '../constants';
 
 function parseJson(s: string): any | null {
   try { return JSON.parse(s.trim()); } catch {}
@@ -28,10 +29,18 @@ export class OpenCodeDriver implements AgentDriver {
     private cliPath: string = '/usr/bin/opencode',
   ) {}
 
-  private async tryReadOutputFile(path: string): Promise<any | null> {
-    const content = await readFileFromContainer(this.projectId, path);
-    if (!content) return null;
-    return parseJson(content);
+  private async tryReadOutputFile(path: string, retries = 1, retryDelayMs = 0): Promise<any | null> {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      const content = await readFileFromContainer(this.projectId, path);
+      if (content) {
+        const parsed = parseJson(content);
+        if (parsed) return parsed;
+      }
+      if (attempt < retries - 1 && retryDelayMs > 0) {
+        await new Promise(r => setTimeout(r, retryDelayMs));
+      }
+    }
+    return null;
   }
 
   private outputFileError(path: string): Error {
@@ -78,34 +87,58 @@ export class OpenCodeDriver implements AgentDriver {
     }
   }
 
+  private async runAgentTask(opts: {
+    promptPath: string;
+    prompt: string;
+    workdir: string;
+    timeout: number;
+    sessionId?: string;
+  }): Promise<{ stdout: string; stderr: string; exitCode: number; sessionId: string | null }> {
+    await ensureWorkdir(this.projectId, opts.workdir);
+    await writeFileInContainer(this.projectId, opts.promptPath, opts.prompt);
+
+    const timeoutSec = Math.floor(opts.timeout / 1000);
+
+    const result = await execInContainer(this.projectId, [
+      'timeout', String(timeoutSec),
+      this.cliPath, 'run', '--format', 'json', '--dangerously-skip-permissions', '--dir', opts.workdir,
+      ...(opts.sessionId ? ['--session', opts.sessionId] : []),
+      '执行任务', '-f', opts.promptPath,
+    ], {
+      workdir: opts.workdir,
+      timeout: opts.timeout + 5000,
+    });
+
+    return {
+      ...result,
+      sessionId: findSessionId(result.stdout),
+    };
+  }
+
   async executePlan(params: {
     prompt: string;
     workdir: string;
     timeout: number;
     round: number;
   }): Promise<PlanOutput> {
-    const promptPath = `${params.workdir}/plan_prompt.md`;
-    const outputPath = `${params.workdir}/plan_output_${params.round}.json`;
-    await ensureWorkdir(this.projectId, params.workdir);
-    await writeFileInContainer(this.projectId, promptPath, params.prompt);
+    const outputPath = `${params.workdir}/${planOutputFile(params.round)}`;
 
-    const timeoutSec = Math.floor(params.timeout / 1000);
-
-    const result = await execInContainer(this.projectId, [
-      'timeout', String(timeoutSec),
-      this.cliPath, 'run', '--format', 'json',  '--dangerously-skip-permissions', '--dir', params.workdir,
-      '执行任务', '-f', promptPath,
-    ], {
+    const result = await this.runAgentTask({
+      promptPath: `${params.workdir}/plan_prompt.md`,
+      prompt: params.prompt,
       workdir: params.workdir,
-      timeout: params.timeout + 5000,
+      timeout: params.timeout,
     });
 
-    const sessionId = findSessionId(result.stdout);
+    const timedOut = result.exitCode === 124 || result.exitCode === -1;
+    if (timedOut) {
+      throw new Error('Plan execution timed out');
+    }
 
     await this.validateAndFix({
       mode: 'plan',
       outputPath,
-      sessionId: sessionId ?? null,
+      sessionId: null,
       workdir: params.workdir,
       timeout: params.timeout,
       maxRetries: config.maxValidationRetries,
@@ -127,23 +160,16 @@ export class OpenCodeDriver implements AgentDriver {
     workdir: string;
     timeout: number;
   }): Promise<ActResult> {
-    const promptPath = `${params.workdir}/act_prompt.md`;
-    const outputPath = `${params.workdir}/act_output.json`;
-    await ensureWorkdir(this.projectId, params.workdir);
-    await writeFileInContainer(this.projectId, promptPath, params.prompt);
+    const outputPath = `${params.workdir}/${ACT_OUTPUT_FILE}`;
 
-    const timeoutSec = Math.floor(params.timeout / 1000);
-
-    const result = await execInContainer(this.projectId, [
-      'timeout', String(timeoutSec),
-      this.cliPath, 'run', '--format', 'json',  '--dangerously-skip-permissions', '--dir', params.workdir,
-      '执行任务', '-f', promptPath,
-    ], {
+    const result = await this.runAgentTask({
+      promptPath: `${params.workdir}/act_prompt.md`,
+      prompt: params.prompt,
       workdir: params.workdir,
-      timeout: params.timeout + 5000,
+      timeout: params.timeout,
     });
 
-    const sessionId = findSessionId(result.stdout) || `fallback-${Date.now()}`;
+    const sessionId = result.sessionId || `fallback-${Date.now()}`;
     const timedOut = result.exitCode === 124 || result.exitCode === -1;
 
     if (!timedOut) {
@@ -157,7 +183,9 @@ export class OpenCodeDriver implements AgentDriver {
       });
     }
 
-    const output = await this.tryReadOutputFile(outputPath);
+    const output = timedOut
+      ? await this.tryReadOutputFile(outputPath, 3, 2000)
+      : await this.tryReadOutputFile(outputPath);
     if (!output) {
       if (timedOut) {
         return {
@@ -186,21 +214,14 @@ export class OpenCodeDriver implements AgentDriver {
     workdir: string;
     timeout: number;
   }): Promise<AgentOutput> {
-    const promptPath = `${params.workdir}/conclude_prompt.md`;
-    const outputPath = `${params.workdir}/act_output.json`;
-    await ensureWorkdir(this.projectId, params.workdir);
-    await writeFileInContainer(this.projectId, promptPath, params.prompt);
+    const outputPath = `${params.workdir}/${ACT_OUTPUT_FILE}`;
 
-    const timeoutSec = Math.floor(params.timeout / 1000);
-
-    await execInContainer(this.projectId, [
-      'timeout', String(timeoutSec),
-      this.cliPath, 'run', '--format', 'json',  '--dangerously-skip-permissions', '--dir', params.workdir,
-      '--session', params.sessionId,
-      '执行任务', '-f', promptPath,
-    ], {
+    await this.runAgentTask({
+      promptPath: `${params.workdir}/conclude_prompt.md`,
+      prompt: params.prompt,
       workdir: params.workdir,
-      timeout: params.timeout + 5000,
+      timeout: params.timeout,
+      sessionId: params.sessionId,
     });
 
     const output = await this.tryReadOutputFile(outputPath);

@@ -3,6 +3,7 @@ import { getSettings } from './db/operations';
 
 const DEFAULTS: Record<string, number> = {
   actTimeoutMs: 600000,
+  concludeTimeoutMs: 300000,
   planTimeoutMs: 600000,
   claimedExpiryMs: 1800000,
   tickIntervalMs: 1000,
@@ -19,6 +20,7 @@ const DEFAULTS: Record<string, number> = {
 
 const ENV_OVERRIDES: Record<string, string> = {
   actTimeoutMs: 'ACT_TIMEOUT_MS',
+  concludeTimeoutMs: 'CONCLUDE_TIMEOUT_MS',
   planTimeoutMs: 'PLAN_TIMEOUT_MS',
   maxFailures: 'MAX_FAILURES',
   maxActConcurrency: 'MAX_ACT_CONCURRENCY',
@@ -32,6 +34,7 @@ interface Config {
   dockerSocket: string;
   agentImages: Record<string, string>;
   actTimeoutMs: number;
+  concludeTimeoutMs: number;
   planTimeoutMs: number;
   claimedExpiryMs: number;
   tickIntervalMs: number;
@@ -55,6 +58,7 @@ const _config: Config = {
     mock: 'test-agent:v1',
   },
   actTimeoutMs: DEFAULTS.actTimeoutMs,
+  concludeTimeoutMs: DEFAULTS.concludeTimeoutMs,
   planTimeoutMs: DEFAULTS.planTimeoutMs,
   claimedExpiryMs: DEFAULTS.claimedExpiryMs,
   tickIntervalMs: DEFAULTS.tickIntervalMs,
@@ -79,15 +83,13 @@ export function loadConfigFromDb(db: Database.Database): void {
     const envVal = envKey ? process.env[envKey] : undefined;
 
     if (envVal !== undefined) {
-      (_config as any)[key] = parseInt(envVal, 10) || defaultVal;
+      const parsed = Number(envVal);
+      (_config as any)[key] = isNaN(parsed) ? defaultVal : parsed;
     } else if (settings[key] !== undefined) {
-      (_config as any)[key] = parseInt(settings[key], 10) || defaultVal;
+      const parsed = Number(settings[key]);
+      (_config as any)[key] = isNaN(parsed) ? defaultVal : parsed;
     } else {
       (_config as any)[key] = defaultVal;
     }
   }
-}
-
-export function reloadConfig(db: Database.Database): void {
-  loadConfigFromDb(db);
 }

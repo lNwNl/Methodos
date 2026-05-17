@@ -1,7 +1,8 @@
 import type { Snapshot } from '../types';
+import { planOutputFile } from '../constants';
 
-export function renderPlanPrompt(snapshot: Snapshot, round: number): string {
-  const file = `/root/workspace/plan_output_${round}.json`;
+export function renderPlanPrompt(snapshot: Snapshot, round: number, workdir: string): string {
+  const file = `${workdir}/${planOutputFile(round)}`;
   return `你是一个安全测试规划者。分析当前探索图谱，决定下一步行动。
 
 你的职责是规划，不是执行。不要运行 nmap、curl、sqlmap 等探索命令——这些由其他执行者完成。你应该专注于分析已有发现，规划接下来的探索方向。

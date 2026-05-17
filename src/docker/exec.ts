@@ -1,8 +1,6 @@
-import { getContainerName } from './index';
+import { getContainerName, PODMAN } from './index';
 import { config } from '../config';
 import { execFile } from 'node:child_process';
-
-const PODMAN = process.env.DOCKER_BIN || 'podman';
 
 export interface ExecResult {
   stdout: string;
@@ -63,10 +61,13 @@ export async function writeFileInContainer(
 
   // Use podman exec with stdin to write file content
   const containerName = getContainerName(projectId);
-  return new Promise<void>((resolve) => {
+  return new Promise<void>((resolve, reject) => {
     const child = execFile(PODMAN, ['exec', '-i', containerName, 'tee', containerPath], {
       timeout: 10000,
-    }, () => resolve());
+    }, (err) => {
+      if (err) { reject(err); return; }
+      resolve();
+    });
     child.stdin?.write(content);
     child.stdin?.end();
   });
@@ -77,10 +78,13 @@ export async function ensureWorkdir(
   workdir: string,
 ): Promise<void> {
   const containerName = getContainerName(projectId);
-  return new Promise<void>((resolve) => {
+  return new Promise<void>((resolve, reject) => {
     execFile(PODMAN, ['exec', containerName, 'mkdir', '-p', workdir], {
       timeout: 5000,
-    }, () => resolve());
+    }, (err) => {
+      if (err) { reject(err); return; }
+      resolve();
+    });
   });
 }
 

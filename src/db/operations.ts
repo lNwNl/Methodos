@@ -1,9 +1,5 @@
 import Database from 'better-sqlite3';
 
-function now() {
-  return new Date().toISOString();
-}
-
 export function createProject(
   db: Database.Database,
   title: string,
@@ -72,14 +68,17 @@ export function insertEdges(
   ts: string,
 ): number[] {
   const ids: number[] = [];
-  for (const edge of edges) {
-    const id = nextEdgeId(db, projectId);
-    db.prepare(`
-      INSERT INTO edges (project_id, id, from_node_ids, to_node_ids, title, direction_description, priority, created_at)
-      VALUES (?, ?, ?, '[]', ?, ?, 1.0, ?)
-    `).run(projectId, id, JSON.stringify(edge.from_node_ids), edge.title || null, edge.direction_description, ts);
-    ids.push(id);
-  }
+  const txn = db.transaction(() => {
+    for (const edge of edges) {
+      const id = nextEdgeId(db, projectId);
+      db.prepare(`
+        INSERT INTO edges (project_id, id, from_node_ids, to_node_ids, title, direction_description, priority, created_at)
+        VALUES (?, ?, ?, '[]', ?, ?, 1.0, ?)
+      `).run(projectId, id, JSON.stringify(edge.from_node_ids), edge.title || null, edge.direction_description, ts);
+      ids.push(id);
+    }
+  });
+  txn();
   return ids;
 }
 

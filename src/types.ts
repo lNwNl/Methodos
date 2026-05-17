@@ -18,5 +18,3 @@ export interface Snapshot {
   nodes: SnapshotNode[];
   edges: SnapshotEdge[];
 }
-
-export type ProjectStatus = 'active' | 'completed' | 'failed' | 'stopped';
