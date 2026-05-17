@@ -242,6 +242,18 @@ createApp({
       return m[p.status] || m.active;
     }
 
+    function formatDuration(ms) {
+      if (!ms || ms < 0) return '';
+      var s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's';
+      var m = Math.floor(s / 60);
+      s = s % 60;
+      if (m < 60) return m + 'm' + String(s).padStart(2, '0') + 's';
+      var h = Math.floor(m / 60);
+      m = m % 60;
+      return h + 'h' + String(m).padStart(2, '0') + 'm';
+    }
+
     onMounted(() => {
       fetchMode().then(fetchProjects);
       timer = setInterval(fetchProjects, 2000);
@@ -250,7 +262,7 @@ createApp({
 
     return {
       projects, loading, error, showModal, form, submitting, agents,
-      createProject, stopProject, pushProject, statusInfo, toggleTheme,
+      createProject, stopProject, pushProject, statusInfo, toggleTheme, formatDuration,
       showSettings, settingsTab, settingsLoading, settingsSaving, settings, openSettings, saveSettings,
       reportSettings, reportSettingsLoading, reportSettingsSaving, fetchReportSettings, saveReportSettings,
     };
@@ -423,6 +435,7 @@ createApp({
             </a>
             <div class="stats-row">
               <span :class="'badge ' + statusInfo(p).cls">{{ statusInfo(p).label }}</span>
+              <span v-if="p.created_at && p.updated_at" class="stat">耗时 <span class="stat-val">{{ formatDuration(new Date(p.updated_at) - new Date(p.created_at)) }}</span></span>
               <span class="stat">Nodes <span class="stat-val">{{ p.node_count }}</span></span>
               <span class="stat">Edges <span class="stat-val">{{ p.edge_total }}</span></span>
               <span v-if="p.edge_unresulted > 0" class="stat" style="color:var(--warning)">待处理 <span class="stat-val" style="color:var(--warning)">{{ p.edge_unresulted }}</span></span>

@@ -640,6 +640,47 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
       } catch { return iso; }
     }
 
+    function formatDuration(ms) {
+      if (!ms || ms < 0) return '';
+      var s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's';
+      var m = Math.floor(s / 60);
+      s = s % 60;
+      if (m < 60) return m + 'm' + String(s).padStart(2, '0') + 's';
+      var h = Math.floor(m / 60);
+      m = m % 60;
+      return h + 'h' + String(m).padStart(2, '0') + 'm';
+    }
+
+    function computeEdgeTimings() {
+      const p = project.value;
+      if (!p) return [];
+      const nodeMap = new Map();
+      for (const n of p.nodes) nodeMap.set(n.id, n);
+      const timings = [];
+      for (const e of p.edges) {
+        const created = e.created_at ? new Date(e.created_at).getTime() : 0;
+        const claimed = e.claimed_at ? new Date(e.claimed_at).getTime() : 0;
+        var execEnd = 0;
+        if (e.to_node_ids.length > 0) {
+          const rn = nodeMap.get(e.to_node_ids[0]);
+          if (rn) execEnd = new Date(rn.created_at).getTime();
+        }
+        var waitMs = (claimed && created) ? claimed - created : 0;
+        var execMs = (execEnd && claimed) ? execEnd - claimed : 0;
+        var totalMs = waitMs + execMs;
+        timings.push({
+          edgeId: e.id,
+          title: e.title || (e.direction_description ? e.direction_description.slice(0, 15) : ''),
+          waitMs: waitMs,
+          execMs: execMs,
+          totalMs: totalMs,
+          completed: e.to_node_ids.length > 0,
+        });
+      }
+      return timings;
+    }
+
     function buildLog() {
       const p = project.value;
       if (!p) return [];
@@ -650,6 +691,10 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
         const edge = n.edge_id ? edgeMap.get(n.edge_id) : null;
         const fromDesc = edge ? edge.title || trunc(edge.direction_description, 20) : '';
         const isTimeout = n.created_by === 'system' && n.description && n.description.includes('超时');
+        var duration = 0;
+        if (edge && edge.claimed_at && n.created_at) {
+          duration = new Date(n.created_at).getTime() - new Date(edge.claimed_at).getTime();
+        }
         log.push({
           type: 'node',
           createdBy: n.created_by,
@@ -660,6 +705,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
           edgeId: n.edge_id,
           fromDesc,
           isTimeout,
+          duration: duration,
         });
       }
       for (const e of p.edges) {
@@ -668,6 +714,11 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
         if (e.to_node_ids.length > 0) { status = 'completed'; outcome = 'success'; }
         else if (e.claimed_at) status = 'running';
         if (e.failure_count > 0) outcome = 'failed';
+        var edgeDuration = 0;
+        if (e.claimed_at && e.to_node_ids.length > 0) {
+          const rn = p.nodes.find(function(nd) { return nd.id === e.to_node_ids[0]; });
+          if (rn) edgeDuration = new Date(rn.created_at).getTime() - new Date(e.claimed_at).getTime();
+        }
         log.push({
           type: 'edge',
           status,
@@ -677,6 +728,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
           time: e.created_at,
           edgeId: e.id,
           failureCount: e.failure_count,
+          duration: edgeDuration,
         });
       }
       log.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
@@ -687,6 +739,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
           title: '收束',
           time: p.updated_at || '',
           evidenceNodeIds: p.evidence_node_ids || [],
+          duration: 0,
         });
       }
       return log;
@@ -746,7 +799,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
     return {
       project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, panelTab, LAYOUT_NAMES, graphReady,
       latestReport, reportGenerating,
-      stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, formatTime, evidenceNodesDesc, buildLog, selectLogEntry,
+      stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, formatTime, formatDuration, evidenceNodesDesc, buildLog, selectLogEntry, computeEdgeTimings,
       startPanelResize, setLayout, toggleTheme, generateReport,
     };
   },
@@ -818,6 +871,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
           <div class="panel-tabs">
             <button class="panel-tab" :class="{ active: panelTab === 'detail' }" @click="panelTab = 'detail'">详情</button>
             <button class="panel-tab" :class="{ active: panelTab === 'log' }" @click="panelTab = 'log'">日志</button>
+            <button class="panel-tab" :class="{ active: panelTab === 'timing' }" @click="panelTab = 'timing'">耗时</button>
           </div>
 
           <template v-if="panelTab === 'detail'">
@@ -926,6 +980,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
                   <span v-if="entry.type === 'complete'" class="log-tag" :style="{ background: 'rgba(60,93,255,0.12)', color: 'var(--primary)' }">结束</span>
                   <span v-else-if="entry.type === 'node'" class="log-tag" :style="{ background: entry.isTimeout ? 'rgba(239,68,68,0.12)' : entry.createdBy === 'human' ? 'rgba(79,70,229,0.12)' : entry.createdBy === 'agent' ? 'rgba(13,148,136,0.12)' : 'rgba(120,113,108,0.12)', color: entry.isTimeout ? 'var(--danger)' : entry.createdBy === 'human' ? '#4F46E5' : entry.createdBy === 'agent' ? '#0D9488' : '#78716C' }">{{ entry.isTimeout ? '超时' : entry.createdBy }}</span>
                   <span v-else class="log-tag" :style="{ background: entry.outcome === 'success' ? 'rgba(34,197,94,0.12)' : entry.outcome === 'failed' ? 'rgba(239,68,68,0.12)' : entry.status === 'running' ? 'rgba(60,93,255,0.12)' : 'rgba(148,163,184,0.12)', color: entry.outcome === 'success' ? 'var(--success)' : entry.outcome === 'failed' ? 'var(--danger)' : entry.status === 'running' ? 'var(--primary)' : 'var(--text-dim)' }">{{ entry.outcome === 'success' ? '成功' : entry.outcome === 'failed' ? '失败' : entry.status === 'running' ? '执行中' : '新方向' }}</span>
+                  <span v-if="entry.duration > 0" class="log-duration">{{ formatDuration(entry.duration) }}</span>
                 </div>
                 <div class="log-desc" v-if="entry.type === 'complete' && entry.summary">{{ entry.summary }}</div>
                 <div class="log-desc" v-else-if="entry.type !== 'complete'">{{ entry.description }}</div>
@@ -936,6 +991,47 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
             </div>
           </div>
           <div v-else class="detail-panel-empty">暂无日志</div>
+          </template>
+
+          <template v-else-if="panelTab === 'timing'">
+            <template v-if="computeEdgeTimings().length">
+              <div class="timing-summary">
+                <div class="timing-summary-item">
+                  <span class="timing-summary-label">总耗时</span>
+                  <span class="timing-summary-value">{{ formatDuration(project.updated_at && project.created_at ? new Date(project.updated_at) - new Date(project.created_at) : 0) }}</span>
+                </div>
+                <div class="timing-summary-item">
+                  <span class="timing-summary-label">Plan 轮次</span>
+                  <span class="timing-summary-value">{{ project.plan_round || 0 }}</span>
+                </div>
+                <div class="timing-summary-item">
+                  <span class="timing-summary-label">已完成边</span>
+                  <span class="timing-summary-value">{{ computeEdgeTimings().filter(function(t){ return t.completed; }).length }} / {{ computeEdgeTimings().length }}</span>
+                </div>
+                <div class="timing-summary-item">
+                  <span class="timing-summary-label">平均执行</span>
+                  <span class="timing-summary-value">{{ (function(){ var done = computeEdgeTimings().filter(function(t){ return t.completed && t.execMs > 0; }); if(!done.length) return '-'; var avg = done.reduce(function(s,t){ return s+t.execMs; },0)/done.length; return formatDuration(avg); })() }}</span>
+                </div>
+              </div>
+              <div class="timing-list">
+                <div v-for="t in computeEdgeTimings()" :key="t.edgeId" class="timing-row">
+                  <div class="timing-row-header">
+                    <span class="timing-edge-id">#{{ t.edgeId }}</span>
+                    <span class="timing-edge-title">{{ t.title }}</span>
+                    <span class="timing-edge-total">{{ formatDuration(t.totalMs) }}</span>
+                  </div>
+                  <div class="timing-bar-track">
+                    <div class="timing-bar-wait" :style="{ width: (t.totalMs > 0 ? (t.waitMs / (function(){ var maxT = Math.max.apply(null, computeEdgeTimings().map(function(e){return e.totalMs;})); return maxT > 0 ? maxT : 1; })() * 100) : 0) + '%' }"></div>
+                    <div class="timing-bar-exec" :style="{ width: (t.totalMs > 0 ? (t.execMs / (function(){ var maxT = Math.max.apply(null, computeEdgeTimings().map(function(e){return e.totalMs;})); return maxT > 0 ? maxT : 1; })() * 100) : 0) + '%' }"></div>
+                  </div>
+                  <div class="timing-bar-labels">
+                    <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-wait"></span>等待 {{ formatDuration(t.waitMs) }}</span>
+                    <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-exec"></span>执行 {{ formatDuration(t.execMs) }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <div v-else class="timing-empty">暂无耗时数据</div>
           </template>
         </div>
       </div>

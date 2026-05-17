@@ -521,6 +521,73 @@ body {
   padding: 3rem 1rem; color: var(--text-dim); font-size: 0.9rem; gap: 0.5rem;
 }
 
+/* Timing tab */
+.timing-summary {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
+  margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);
+}
+.timing-summary-item {
+  display: flex; flex-direction: column; gap: 0.1rem;
+}
+.timing-summary-label {
+  font-size: 0.7rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.timing-summary-value {
+  font-size: 0.85rem; font-weight: 600; color: var(--text-bright); font-variant-numeric: tabular-nums;
+}
+.timing-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.timing-row {
+  display: flex; flex-direction: column; gap: 0.25rem;
+  padding: 0.4rem 0; border-bottom: 1px solid var(--border);
+}
+.timing-row:last-child { border-bottom: none; }
+.timing-row-header {
+  display: flex; align-items: center; gap: 0.35rem;
+}
+.timing-edge-id {
+  font-size: 0.65rem; font-weight: 600; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 3px; padding: 0px 3px; flex-shrink: 0;
+}
+.timing-edge-title {
+  font-size: 0.78rem; font-weight: 500; color: var(--text); flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.timing-edge-total {
+  font-size: 0.72rem; font-weight: 600; color: var(--text-dim); flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.timing-bar-track {
+  display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--bg-input);
+}
+.timing-bar-wait {
+  background: var(--neutral); opacity: 0.4; transition: width 0.3s ease;
+}
+.timing-bar-exec {
+  background: var(--primary); transition: width 0.3s ease;
+}
+.timing-bar-labels {
+  display: flex; gap: 0.75rem; font-size: 0.68rem; color: var(--text-dim);
+}
+.timing-bar-label {
+  display: flex; align-items: center; gap: 0.25rem;
+}
+.timing-bar-label-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.timing-legend-wait { background: var(--neutral); opacity: 0.4; }
+.timing-legend-exec { background: var(--primary); }
+.timing-empty {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; min-height: 120px; color: var(--text-dim); font-size: 0.85rem; text-align: center;
+}
+
+/* Duration tag in log */
+.log-duration {
+  font-size: 0.65rem; font-weight: 500; color: var(--text-dim);
+  background: var(--bg-input); padding: 0px 4px; border-radius: 3px;
+  flex-shrink: 0; font-variant-numeric: tabular-nums;
+}
+
 /* Back link */
 .back-link { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.82rem; font-weight: 500; color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
 .back-link:hover { color: var(--text-bright); }
