@@ -17,6 +17,7 @@ createApp({
     const settingsSaving = ref(false);
     const settings = reactive({
       actTimeoutMs: 10,
+      concludeTimeoutMs: 5,
       planTimeoutMs: 10,
       claimedExpiryMs: 30,
       tickIntervalMs: 1,
@@ -125,6 +126,7 @@ createApp({
         const r = await fetch('/settings');
         const data = await r.json();
         settings.actTimeoutMs = Math.round((parseInt(data.actTimeoutMs) || 600000) / 60000);
+        settings.concludeTimeoutMs = Math.round((parseInt(data.concludeTimeoutMs) || 300000) / 60000);
         settings.planTimeoutMs = Math.round((parseInt(data.planTimeoutMs) || 600000) / 60000);
         settings.claimedExpiryMs = Math.round((parseInt(data.claimedExpiryMs) || 1800000) / 60000);
         settings.tickIntervalMs = Math.round((parseInt(data.tickIntervalMs) || 1000) / 1000);
@@ -144,6 +146,7 @@ createApp({
       try {
         const body = {
           actTimeoutMs: settings.actTimeoutMs * 60000,
+          concludeTimeoutMs: settings.concludeTimeoutMs * 60000,
           planTimeoutMs: settings.planTimeoutMs * 60000,
           claimedExpiryMs: settings.claimedExpiryMs * 60000,
           tickIntervalMs: settings.tickIntervalMs * 1000,
@@ -274,7 +277,7 @@ createApp({
         <form @submit.prevent="createProject">
           <div class="form-group">
             <label class="form-label">描述</label>
-            <textarea v-model="form.title" class="textarea" rows="2" placeholder="帮我拿到 flag。https://hackme.com"></textarea>
+            <textarea v-model="form.title" class="textarea" rows="5" placeholder="帮我拿到 flag。https://hackme.com"></textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Agent 类型</label>
@@ -307,6 +310,10 @@ createApp({
             <div class="form-group">
               <label class="form-label">Act 超时（分钟）</label>
               <input type="number" v-model.number="settings.actTimeoutMs" class="input" min="1" step="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Conclude 超时（分钟）</label>
+              <input type="number" v-model.number="settings.concludeTimeoutMs" class="input" min="1" step="1">
             </div>
             <div class="form-group">
               <label class="form-label">Plan 超时（分钟）</label>
