@@ -1,4 +1,4 @@
-import { initDb, getRawDb } from '../db/connection';
+import { initDb, getRawDb, closeDb } from '../db/connection';
 import { MockAgentDriver } from '../driver/mock';
 import { OpenCodeDriver } from '../driver/opencode';
 import { createLoop } from './loop';
@@ -36,7 +36,7 @@ const driverFactory = (projectId: number, agentType: string) => {
 
 async function main() {
   const PORT = parseInt(process.env.PORT || '3000', 10);
-  await startServer(db, PORT, USE_DOCKER);
+  const app = await startServer(db, PORT, USE_DOCKER);
 
   console.log('Starting executor loop...');
   const { start } = createLoop(db, driverFactory);
@@ -46,11 +46,16 @@ async function main() {
   console.log(`  Mode: ${USE_DOCKER ? 'Docker' : 'Mock'}`);
   console.log(`  Press Ctrl+C to stop\n`);
 
-  process.on('SIGINT', () => {
-    console.log('\nShutting down...');
+  const shutdown = async (signal: string) => {
+    console.log(`\nReceived ${signal}, shutting down...`);
     stop();
+    await app.close();
+    closeDb();
     process.exit(0);
-  });
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
 main();

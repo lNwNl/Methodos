@@ -3,6 +3,9 @@ import Database from 'better-sqlite3';
 import { createProjectSchema, pushProjectSchema, settingsSchema } from './schemas';
 
 export function registerRoutes(app: FastifyInstance, db: Database.Database, useDocker = false) {
+  // GET /health
+  app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+
   // GET /mode
   app.get('/mode', async (_request, _reply) => {
     return { docker: useDocker };
