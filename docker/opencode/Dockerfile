@@ -1,6 +1,6 @@
 FROM --platform=amd64 kalilinux/kali-rolling:latest
 
-# Layer 1: Kali metapackages — all CLI pentesting tools
+# Single apt layer: metapackages + extra tools + Node.js
 RUN apt update && \
     apt install -y \
         kali-tools-exploitation \
@@ -14,52 +14,40 @@ RUN apt update && \
         kali-tools-crypto-stego \
         kali-tools-windows-resources \
         kali-tools-database \
-        kali-tools-fuzzing && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Layer 2: extra system tools (not covered by metapackages above)
-RUN apt update && \
-    apt install -y \
+        kali-tools-fuzzing \
         bsdextrautils \
         jq \
         iputils-ping \
         sshpass \
         ncat \
-        rlwrap && \
+        rlwrap \
+        ca-certificates \
+        curl \
+        gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
+    apt install -y nodejs && \
+    npm install -g opencode-ai@1.15.3 && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Layer 3: Node.js + opencode
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
-    apt install -y nodejs && \
-    npm install -g opencode-ai@1.14.50 && \
-    apt clean && rm -rf /var/lib/apt/lists/*
-
-# Layer 4: uv/uvx — modern Python tooling, replaces pip
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+# uv + Python packages in one layer
 ENV PATH="/root/.local/bin:$PATH"
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    uv pip install --system pwntools
 
-# Python libraries via uv (replaces pip3 install --break-system-packages)
-RUN uv pip install --system --break-system-packages pwntools
-
-# Layer 5: sudo for root
+# Sudo config
 RUN echo 'root ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/nopasswd && \
     chmod 440 /etc/sudoers.d/nopasswd
 
-# Layer 6: validate-json self-validation script
+# Scripts + configs + skills (ordered by change frequency, least-frequent first)
 COPY validate-json.js /usr/local/bin/validate-json
-RUN chmod +x /usr/local/bin/validate-json
-
-# Layer 7: opencode configs
-COPY AGENTS.md /root/workspace/AGENTS.md
-RUN mkdir -p /root/workspace/.opencode && \
-    echo '{"permission":{"*":{"*":"allow"}}}' > /root/workspace/.opencode/opencode.json && \
-    mkdir -p /root/.config/opencode
 COPY opencode.json /root/.config/opencode/opencode.json
-
-# Layer 8: agent skills
 COPY skills/ /root/.agents/skills/
+COPY AGENTS.md /root/workspace/AGENTS.md
+
+# Workspace setup
+RUN mkdir -p /root/workspace/.opencode && \
+    echo '{"permission":{"*":{"*":"allow"}}}' > /root/workspace/.opencode/opencode.json
 
 WORKDIR /root/workspace
 CMD ["sleep", "infinity"]
