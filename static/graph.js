@@ -1017,7 +1017,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
           <div v-else class="detail-panel-empty">暂无日志</div>
           </template>
 
-          <template v-else-if="panelTab === 'timing'">
+          <template v-if="panelTab === 'timing'">
             <template v-if="edgeTimings.length">
               <div class="timing-summary">
                 <div class="timing-summary-item">
