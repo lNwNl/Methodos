@@ -91,7 +91,7 @@ export class OpenCodeDriver implements AgentDriver {
 
     const timeoutSec = Math.floor(params.timeout / 1000);
 
-    await execInContainer(this.projectId, [
+    const result = await execInContainer(this.projectId, [
       'timeout', String(timeoutSec),
       this.cliPath, 'run', '--format', 'json',  '--dangerously-skip-permissions', '--dir', params.workdir,
       '执行任务', '-f', promptPath,
@@ -100,10 +100,12 @@ export class OpenCodeDriver implements AgentDriver {
       timeout: params.timeout + 5000,
     });
 
+    const sessionId = findSessionId(result.stdout);
+
     await this.validateAndFix({
       mode: 'plan',
       outputPath,
-      sessionId: null,
+      sessionId: sessionId ?? null,
       workdir: params.workdir,
       timeout: params.timeout,
       maxRetries: config.maxValidationRetries,

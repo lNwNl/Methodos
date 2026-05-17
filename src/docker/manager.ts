@@ -9,7 +9,7 @@ const PODMAN = process.env.DOCKER_BIN || 'podman';
 
 function getOpenCodeBinds(): string[] {
   return [
-    `${join(home, '.local/share/opencode')}:/root/.local/share/opencode`,
+    `${join(home, '.local/share/opencode/auth.json')}:/root/.local/share/opencode/auth.json`,
   ];
 }
 
