@@ -752,10 +752,39 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
   },
 
   template: `
-  <div style="display:flex;flex-direction:column;height:100vh;padding:0.75rem 1rem;gap:0.5rem">
+    <div style="display:flex;flex-direction:column;height:100vh;padding:0.75rem 1rem;gap:0.5rem">
       <div class="flex items-center justify-between shrink-0">
       <a href="/" class="back-link">&larr; 返回</a>
       <div v-if="project" class="flex items-center gap-2">
+        <template v-if="project.status === 'completed'">
+          <div class="report-actions">
+            <button
+              v-if="!reportGenerating && (!latestReport || latestReport.status === 'completed' || latestReport.status === 'failed')"
+              class="btn btn-report"
+              @click="generateReport"
+            >
+              <span class="report-icon">📄</span> 生成报告
+            </button>
+            <button
+              v-else-if="reportGenerating"
+              class="btn btn-report-generating"
+              disabled
+            >
+              <span class="spinner"></span> 生成中...
+            </button>
+            <a
+              v-if="latestReport && latestReport.status === 'completed'"
+              :href="'/reports/' + latestReport.id + '/download'"
+              class="btn btn-report-download"
+              target="_blank"
+            >
+              ↓ 下载
+            </a>
+            <span v-if="latestReport && latestReport.status === 'failed'" class="report-error" title="上次生成失败">
+              ✕ 失败
+            </span>
+          </div>
+        </template>
         <button class="theme-toggle" @click="toggleTheme" title="切换主题">◐</button>
         <span :class="'badge ' + statusInfo(project).cls">{{ statusInfo(project).label }}</span>
         <button v-if="project.status === 'active'" class="btn btn-warning btn-sm" @click="stopProject">暂停</button>
@@ -769,32 +798,6 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
     <template v-else-if="project">
       <div class="flex flex-1 min-h-0" style="flex:1;min-height:0;gap:0">
         <div class="graph-container flex-1" style="flex:1;min-width:0;border-right:none;position:relative">
-          <div class="graph-toolbar" style="right:0.5rem;left:auto;display:flex;gap:0.25rem">
-            <template v-if="project.status === 'completed'">
-              <button
-                v-if="!reportGenerating && (!latestReport || latestReport.status === 'completed' || latestReport.status === 'failed')"
-                class="btn btn-sm btn-report"
-                @click="generateReport"
-              >
-                生成报告
-              </button>
-              <button
-                v-else-if="reportGenerating"
-                class="btn btn-sm btn-report"
-                disabled
-              >
-                <span class="spinner"></span> 生成中...
-              </button>
-              <a
-                v-if="latestReport && latestReport.status === 'completed'"
-                :href="'/reports/' + latestReport.id + '/download'"
-                class="btn btn-sm btn-report"
-                target="_blank"
-              >
-                下载报告
-              </a>
-            </template>
-          </div>
           <div v-if="!graphReady" class="graph-loading-overlay">
             <span class="spinner"></span>
           </div>

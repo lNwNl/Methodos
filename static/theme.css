@@ -155,8 +155,67 @@ body {
 .btn-sm { padding: 0.25rem 0.55rem; font-size: 0.76rem; }
 .btn-icon { padding: 0.25rem 0.4rem; font-size: 0.9rem; line-height: 1; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-report { background: var(--primary) !important; border-color: var(--primary) !important; color: #fff !important; font-weight: 600; }
-.btn-report:hover { box-shadow: 0 0 12px var(--primary-glow); }
+
+/* Report Actions */
+.report-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.report-actions .btn {
+  border: none;
+  border-radius: 0;
+  border-right: 1px solid var(--border);
+}
+.report-actions .btn:last-child {
+  border-right: none;
+}
+.btn-report {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+}
+.btn-report:hover {
+  background: var(--primary-hover, #2D4BFF);
+  color: #fff;
+}
+.btn-report-generating {
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+  cursor: wait;
+}
+.btn-report-download {
+  background: var(--bg-surface);
+  color: var(--primary);
+  font-weight: 500;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+.btn-report-download:hover {
+  background: var(--primary);
+  color: #fff;
+}
+.report-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  color: var(--danger);
+  background: var(--bg-elevated);
+}
+.report-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
 
 /* Cards */
 .card {
