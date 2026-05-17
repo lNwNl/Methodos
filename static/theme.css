@@ -293,6 +293,32 @@ body {
 .form-label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-dim); margin-bottom: 0.3rem; }
 .form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
 
+/* Settings Tabs */
+.settings-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+.settings-tab {
+  padding: 0.45rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.settings-tab:hover {
+  color: var(--text);
+}
+.settings-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
 /* Stats row */
 .stats-row {
   display: flex; gap: 1rem; flex-wrap: wrap;

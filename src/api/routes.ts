@@ -161,8 +161,8 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
 
   // POST /projects/:id/report - 触发报告生成
   app.post('/projects/:id/report', async (request, reply) => {
-    const { getProject, createReport, updateReportStatus } = await import('../db/operations');
-    const { generateReport } = await import('../report/runner');
+    const { getProject, createReport, updateReportStatus, getSettings } = await import('../db/operations');
+    const { generateReport, buildReportEnv } = await import('../report/runner');
     const { config } = await import('../config');
 
     const id = parseInt((request.params as any).id, 10);
@@ -178,11 +178,16 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
     const ts = new Date().toISOString();
     const reportId = createReport(db, id, 'md', ts);
 
+    // 从数据库读取报告配置，注入为环境变量
+    const settings = getSettings(db);
+    const reportEnv = buildReportEnv(settings);
+
     // 异步生成报告
     generateReport({
       projectId: id,
       reportId,
       dbPath: config.databasePath,
+      env: reportEnv,
       onComplete: (filePath) => {
         updateReportStatus(db, reportId, 'completed', filePath);
         console.log(`Report ${reportId} generated: ${filePath}`);
@@ -216,6 +221,78 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
       created_at: report.created_at,
       completed_at: report.completed_at,
     });
+  });
+
+  // GET /settings/report - 获取报告配置（敏感字段脱敏）
+  app.get('/settings/report', async (_request, _reply) => {
+    const { getSettings } = await import('../db/operations');
+    const settings = getSettings(db);
+
+    const keys = [
+      'report.llm_provider',
+      'report.openai_api_key',
+      'report.openai_base_url',
+      'report.anthropic_api_key',
+      'report.ollama_base_url',
+      'report.model_name',
+      'report.temperature',
+    ];
+
+    const result: Record<string, string> = {};
+    for (const k of keys) {
+      const val = settings[k] ?? '';
+      // 敏感字段脱敏：只显示前 4 位和后 4 位
+      if (k.endsWith('_key') && val.length > 8) {
+        result[k] = val.slice(0, 4) + '••••••••' + val.slice(-4);
+      } else {
+        result[k] = val;
+      }
+    }
+    return result;
+  });
+
+  // PUT /settings/report - 更新报告配置
+  app.put('/settings/report', async (request, reply) => {
+    const { getSettings, updateSettings } = await import('../db/operations');
+
+    const body = request.body as Record<string, string>;
+    const allowedKeys = [
+      'report.llm_provider',
+      'report.openai_api_key',
+      'report.openai_base_url',
+      'report.anthropic_api_key',
+      'report.ollama_base_url',
+      'report.model_name',
+      'report.temperature',
+    ];
+
+    // 只保留允许的 key；跳过被脱敏的 key（含 •）
+    const filtered: Record<string, string> = {};
+    for (const k of allowedKeys) {
+      if (k in body && typeof body[k] === 'string' && !body[k].includes('•')) {
+        filtered[k] = body[k];
+      }
+    }
+
+    if (Object.keys(filtered).length === 0) {
+      return reply.status(400).send({ error: 'No valid settings to update' });
+    }
+
+    const ts = new Date().toISOString();
+    updateSettings(db, filtered, ts);
+
+    // 返回脱敏后的完整配置
+    const settings = getSettings(db);
+    const result: Record<string, string> = {};
+    for (const k of allowedKeys) {
+      const val = settings[k] ?? '';
+      if (k.endsWith('_key') && val.length > 8) {
+        result[k] = val.slice(0, 4) + '••••••••' + val.slice(-4);
+      } else {
+        result[k] = val;
+      }
+    }
+    return result;
   });
 
   // GET /reports/:id/download - 下载报告文件

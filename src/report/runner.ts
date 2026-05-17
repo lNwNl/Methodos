@@ -4,6 +4,29 @@ import { access, mkdir } from 'node:fs/promises';
 
 const REPORT_DIR = join(process.cwd(), 'report');
 
+// 报告配置 key 映射：数据库 key -> 环境变量名
+const REPORT_ENV_MAP: Record<string, string> = {
+  'report.llm_provider':  'REPORT_LLM_PROVIDER',
+  'report.openai_api_key':    'REPORT_OPENAI_API_KEY',
+  'report.openai_base_url':   'REPORT_OPENAI_BASE_URL',
+  'report.anthropic_api_key': 'REPORT_ANTHROPIC_API_KEY',
+  'report.ollama_base_url':   'REPORT_OLLAMA_BASE_URL',
+  'report.model_name':   'REPORT_MODEL_NAME',
+  'report.temperature':  'REPORT_TEMPERATURE',
+};
+
+// 从 settings 中提取报告相关配置，转为环境变量
+export function buildReportEnv(settings: Record<string, string>): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [dbKey, envKey] of Object.entries(REPORT_ENV_MAP)) {
+    const val = settings[dbKey];
+    if (val !== undefined && val !== '') {
+      env[envKey] = val;
+    }
+  }
+  return env;
+}
+
 // 检查并初始化 Python 环境
 export async function ensurePythonEnv(): Promise<void> {
   const venvPath = join(REPORT_DIR, '.venv');
@@ -22,10 +45,11 @@ export async function generateReport(params: {
   projectId: number;
   reportId: number;
   dbPath: string;
+  env?: Record<string, string>;
   onComplete: (filePath: string) => void;
   onError: (error: string) => void;
 }): Promise<void> {
-  const { projectId, reportId, dbPath, onComplete, onError } = params;
+  const { projectId, reportId, dbPath, env: extraEnv, onComplete, onError } = params;
 
   const outputDir = join(process.cwd(), 'data', 'reports', String(projectId));
   await mkdir(outputDir, { recursive: true });
@@ -40,6 +64,7 @@ export async function generateReport(params: {
   ], {
     cwd: REPORT_DIR,
     stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, ...extraEnv },
   });
 
   let stderr = '';

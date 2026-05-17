@@ -1,34 +1,30 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-
-# 加载 .env 文件
-load_dotenv()
 
 
 class Config:
-    """报告生成模块配置"""
+    """报告生成模块配置
+
+    优先级：环境变量 > .env 文件 > 默认值
+    环境变量由 TypeScript 服务端从数据库读取后注入。
+    """
 
     # LLM 配置
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")
+    LLM_PROVIDER: str = os.getenv("REPORT_LLM_PROVIDER", os.getenv("LLM_PROVIDER", "openai"))
 
     # OpenAI 配置
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    OPENAI_API_KEY: str = os.getenv("REPORT_OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""))
+    OPENAI_BASE_URL: str = os.getenv("REPORT_OPENAI_BASE_URL", os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"))
 
     # Anthropic 配置
-    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    ANTHROPIC_API_KEY: str = os.getenv("REPORT_ANTHROPIC_API_KEY", os.getenv("ANTHROPIC_API_KEY", ""))
 
     # Ollama 配置
-    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    OLLAMA_BASE_URL: str = os.getenv("REPORT_OLLAMA_BASE_URL", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
 
     # 模型配置
-    MODEL_NAME: str = os.getenv("MODEL_NAME", "gpt-4o")
-    TEMPERATURE: float = float(os.getenv("TEMPERATURE", "0.7"))
-
-    # 服务配置
-    API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
-    API_PORT: int = int(os.getenv("API_PORT", "8001"))
+    MODEL_NAME: str = os.getenv("REPORT_MODEL_NAME", os.getenv("MODEL_NAME", "gpt-4o"))
+    TEMPERATURE: float = float(os.getenv("REPORT_TEMPERATURE", os.getenv("TEMPERATURE", "0.7")))
 
     # 数据库默认路径
     DEFAULT_DB_PATH: str = os.getenv("DEFAULT_DB_PATH", "data/methodos.db")
