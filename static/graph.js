@@ -1051,7 +1051,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
                   <tr v-for="t in edgeTimings" :key="t.edgeId" :class="{ 'timing-row-done': t.completed }">
                     <td class="timing-td-id">{{ t.edgeId }}</td>
                     <td class="timing-td-val">{{ formatDuration(t.waitMs) || '—' }}</td>
-                    <td class="timing-td-val">{{ formatDuration(t.execMs) || '—' }}</td>
+                    <td class="timing-td-val">{{ t.completed && t.execMs === 0 ? '<1s' : formatDuration(t.execMs) || '—' }}</td>
                     <td class="timing-td-val timing-td-total">{{ formatDuration(t.totalMs) || '—' }}</td>
                     <td>
                       <div class="timing-bar-track">
