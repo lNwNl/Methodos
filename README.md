@@ -13,29 +13,29 @@
 ┌────────────────────────┴────────────────────────────────┐
 │                   Fastify Server                         │
 │            REST API + 静态文件服务                        │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────┴────────────────────────────────┐
-│                  Executor Loop                           │
-│  ┌──────────┐  ┌──────────┐  ┌───────────┐             │
-│  │  Plan    │→ │   Act    │→ │ Conclude  │             │
-│  │ (规划)   │  │ (执行)   │  │ (总结)    │             │
-│  └──────────┘  └──────────┘  └───────────┘             │
-│        ↕              ↕                                  │
-│  ┌──────────────────────────────────────┐               │
-│  │       Agent Driver (抽象层)          │               │
-│  │  OpenCode Driver │ Mock Driver       │               │
-│  └──────────────────────────────────────┘               │
-│        ↕                                                │
-│  ┌──────────────────────────────────────┐               │
-│  │    Docker/Podman Container Pool      │               │
-│  │  每个 Project 一个隔离容器           │               │
-│  └──────────────────────────────────────┘               │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────┴────────────────────────────────┐
+└────────┬──────────────────────────────────┬──────────────┘
+         │                                  │
+┌────────┴──────────────┐    ┌──────────────┴──────────────┐
+│     Executor Loop     │    │     Report Generator         │
+│  ┌──────────┐         │    │  Python (uv) 子进程          │
+│  │  Plan    │→ Act →  │    │  LLM 驱动报告生成            │
+│  │ Conclude │         │    └──────────────────────────────┘
+│  └──────────┘         │
+│        ↕              │
+│  ┌────────────────────┤
+│  │  Agent Driver      │
+│  │  OpenCode │ Mock   │
+│  └────────────────────┤
+│        ↕              │
+│  ┌────────────────────┤
+│  │  Container Pool    │
+│  │  Docker / Podman   │
+│  └────────────────────┘
+└────────┬──────────────┘
+         │
+┌────────┴────────────────────────────────────────────────┐
 │               SQLite (better-sqlite3 + Drizzle)          │
-│        projects │ nodes │ edges │ settings               │
+│        projects │ nodes │ edges │ reports │ settings     │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -47,6 +47,10 @@
 
 - **Node（节点）**：一个发现或事实。来源分为 `human`（人工输入）、`agent`（Agent 产出）、`system`（系统生成，如超时记录）。
 - **Edge（边）**：一个探索方向。`from_node_ids` 指向已有节点，`to_node_ids` 在执行完成后指向新产出的节点。未执行的边（`to_node_ids = []`）是待探索的任务。
+
+### validateAndFix 机制
+
+Plan 和 Act 执行后，Agent 输出的 JSON 会经过校验。若输出文件缺失或格式不合法，系统自动重试（最多 `maxValidationRetries` 次），引导 Agent 修正输出格式。
 
 ### Plan-Act 循环
 
@@ -70,7 +74,7 @@
 | 层         | 技术                                           |
 | ---------- | ---------------------------------------------- |
 | 语言       | TypeScript (ES2024, ESM)                       |
-| 运行时     | Node.js + tsx                                  |
+| 运行时     | Node.js 24 + tsx                               |
 | HTTP       | Fastify 5                                      |
 | 数据库     | SQLite + better-sqlite3 + Drizzle ORM          |
 | 容器       | Dockerode + Podman                             |
@@ -78,6 +82,7 @@
 | 样式       | Tailwind CSS 4                                 |
 | 校验       | Zod 4                                          |
 | 日志       | Pino                                           |
+| 报告       | Python (uv) + LLM 驱动报告生成                  |
 | 测试       | Vitest                                         |
 
 ## 项目结构
@@ -114,8 +119,13 @@ src/
 │   ├── plan.ts            # Plan 阶段 prompt 模板
 │   ├── act.ts             # Act 阶段 prompt 模板
 │   └── conclude.ts        # Conclude 阶段 prompt 模板
+├── report/
+│   └── runner.ts          # 报告生成模块（调用 Python uv 子进程）
 ├── snapshot/
 │   └── render.ts          # 图谱快照渲染（截断策略）
+├── __tests__/
+│   └── integration/
+│       └── multi-level-queue.test.ts  # 多级反馈队列集成测试
 ├── config.ts              # 配置管理（默认值 + 环境变量 + DB 覆盖）
 └── types.ts               # 共享类型定义
 
@@ -136,7 +146,7 @@ docker/
 
 ### 前置条件
 
-- Node.js ≥ 20
+- Node.js ≥ 24
 - Podman（或 Docker，需修改 `DOCKER_BIN` 环境变量）
 
 ### 安装
@@ -203,19 +213,49 @@ npm run typecheck
 
 数据库路径通过 `DATABASE_PATH` 环境变量配置（默认 `./data/methodos.db`）。
 
+## 报告生成
+
+项目完成后可触发渗透测试报告生成。报告由 Python 子进程（`uv run methodos-report`）调用 LLM 生成 Markdown 格式报告，存储在 `data/reports/<projectId>/` 目录下。
+
+报告 LLM 配置通过 `/settings/report` API 或环境变量设置：
+
+| 配置项                    | 环境变量                  | 说明               |
+| ------------------------- | ------------------------- | ------------------ |
+| `report.llm_provider`     | `REPORT_LLM_PROVIDER`     | LLM 提供商         |
+| `report.openai_api_key`   | `REPORT_OPENAI_API_KEY`   | OpenAI API Key     |
+| `report.openai_base_url`  | `REPORT_OPENAI_BASE_URL`  | OpenAI 兼容 Base URL |
+| `report.anthropic_api_key`| `REPORT_ANTHROPIC_API_KEY`| Anthropic API Key  |
+| `report.ollama_base_url`  | `REPORT_OLLAMA_BASE_URL`  | Ollama Base URL    |
+| `report.model_name`       | `REPORT_MODEL_NAME`       | 模型名称           |
+| `report.temperature`      | `REPORT_TEMPERATURE`      | 生成温度           |
+
+## CI/CD
+
+GitHub Actions 自动构建 Docker 镜像并推送至 GitHub Container Registry (GHCR)：
+
+- 触发条件：推送到 `master` 分支或 `v*.*.*` 标签
+- 镜像地址：`ghcr.io/<repo>/opencode`
+- Workflow 文件：`.github/workflows/docker-publish.yml`
+
 ## API
 
-| 方法   | 路径                    | 说明                     |
-| ------ | ----------------------- | ------------------------ |
-| `GET`  | `/mode`                 | 当前运行模式（docker/mock）|
-| `POST` | `/projects`             | 创建项目                 |
-| `GET`  | `/projects`             | 列出所有项目             |
-| `GET`  | `/projects/:id`         | 获取项目详情（含节点和边）|
-| `POST` | `/projects/:id/stop`    | 暂停项目                 |
-| `POST` | `/projects/:id/push`    | 推进项目（添加人工节点/恢复）|
-| `GET`  | `/projects/:id/edges`   | 获取边状态列表           |
-| `GET`  | `/settings`             | 获取当前设置             |
-| `PUT`  | `/settings`             | 更新设置                 |
+| 方法   | 路径                          | 说明                               |
+| ------ | ----------------------------- | ---------------------------------- |
+| `GET`  | `/health`                     | 健康检查                           |
+| `GET`  | `/mode`                       | 当前运行模式（docker/mock）        |
+| `POST` | `/projects`                   | 创建项目                           |
+| `GET`  | `/projects`                   | 列出所有项目                       |
+| `GET`  | `/projects/:id`               | 获取项目详情（含节点和边）         |
+| `POST` | `/projects/:id/stop`          | 暂停项目                           |
+| `POST` | `/projects/:id/push`          | 推进项目（添加人工节点/恢复）      |
+| `GET`  | `/projects/:id/edges`         | 获取边状态列表                     |
+| `GET`  | `/settings`                   | 获取当前设置                       |
+| `PUT`  | `/settings`                   | 更新设置                           |
+| `POST` | `/projects/:id/report`        | 触发报告生成（项目需已完成）       |
+| `GET`  | `/projects/:id/report/latest` | 获取最近报告状态                   |
+| `GET`  | `/settings/report`            | 获取报告配置（敏感字段脱敏）       |
+| `PUT`  | `/settings/report`            | 更新报告配置                       |
+| `GET`  | `/reports/:id/download`       | 下载报告文件（Markdown）           |
 
 ## Agent Driver 接口
 

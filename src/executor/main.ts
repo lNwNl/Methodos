@@ -51,9 +51,15 @@ async function main() {
   console.log(`  Mode: ${USE_DOCKER ? 'Docker' : 'Mock'}`);
   console.log(`  Press Ctrl+C to stop\n`);
 
+  let shuttingDown = false;
   const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(`\nReceived ${signal}, shutting down...`);
     stop();
+
+    const server = app.server;
+    server.closeAllConnections();
     await app.close();
     closeDb();
     process.exit(0);
