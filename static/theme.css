@@ -535,22 +535,29 @@ body {
 .timing-summary-value {
   font-size: 0.85rem; font-weight: 600; color: var(--text-bright); font-variant-numeric: tabular-nums;
 }
-.timing-list { display: flex; flex-direction: column; gap: 0.35rem; }
-.timing-row {
-  display: flex; flex-direction: column; gap: 0.2rem;
-  padding: 0.35rem 0; border-bottom: 1px solid var(--border);
+.timing-table {
+  width: 100%; border-collapse: collapse; font-size: 0.75rem;
 }
-.timing-row:last-child { border-bottom: none; }
-.timing-row-header {
-  display: flex; align-items: center; gap: 0.35rem;
+.timing-table th {
+  font-size: 0.68rem; font-weight: 600; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  text-align: left; padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--border);
 }
-.timing-edge-id {
-  font-size: 0.65rem; font-weight: 600; color: var(--text-dim);
-  border: 1px solid var(--border); border-radius: 3px; padding: 0px 3px; flex-shrink: 0;
+.timing-table td {
+  padding: 0.35rem 0.4rem; border-bottom: 1px solid var(--border);
+  vertical-align: middle;
 }
-.timing-edge-total {
-  font-size: 0.72rem; font-weight: 600; color: var(--text-dim); flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
+.timing-table tr:last-child td { border-bottom: none; }
+.timing-table tr.timing-row-done { opacity: 0.85; }
+.timing-td-id {
+  font-weight: 600; color: var(--text-dim); font-variant-numeric: tabular-nums;
+}
+.timing-td-val {
+  color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.timing-td-total {
+  font-weight: 600; color: var(--text-bright);
 }
 .timing-bar-track {
   display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--bg-input);
@@ -561,8 +568,8 @@ body {
 .timing-bar-exec {
   background: var(--primary);
 }
-.timing-bar-labels {
-  display: flex; gap: 0.75rem; font-size: 0.68rem; color: var(--text-dim);
+.timing-legend {
+  display: flex; gap: 0.75rem; margin-top: 0.5rem; font-size: 0.68rem; color: var(--text-dim);
 }
 .timing-bar-label {
   display: flex; align-items: center; gap: 0.25rem;

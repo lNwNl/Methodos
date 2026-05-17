@@ -904,7 +904,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
               <div class="detail-title">探索点</div>
               <div class="detail-field">
                 <div class="detail-label">编号</div>
-                <div class="detail-value">E{{ selected.edgeId }}</div>
+                <div class="detail-value">Edge {{ selected.edgeId }}</div>
               </div>
               <div class="detail-field">
                 <div class="detail-label">状态</div>
@@ -926,7 +926,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
                 <div class="detail-label">支撑节点</div>
                 <div class="detail-value">
                   <div v-for="ev in evidenceNodesDesc(selected.evidenceIds)" :key="ev.id" style="margin-bottom:3px;display:flex;align-items:center;gap:0.35rem">
-                    <span style="flex-shrink:0;font-size:0.7rem;font-weight:600;color:var(--primary);border:1px solid var(--primary);border-radius:3px;padding:0px 4px">N{{ ev.id }}</span>
+                    <span style="flex-shrink:0;font-size:0.7rem;font-weight:600;color:var(--primary);border:1px solid var(--primary);border-radius:3px;padding:0px 4px">Node {{ ev.id }}</span>
                     <span style="font-size:0.75rem;color:var(--text)">{{ ev.title }}</span>
                   </div>
                 </div>
@@ -940,7 +940,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
               <div class="detail-title">{{ selected.title || '节点' }}</div>
               <div class="detail-field">
                 <div class="detail-label">编号</div>
-                <div class="detail-value">N{{ selected.nodeId }}</div>
+                <div class="detail-value">Node {{ selected.nodeId }}</div>
               </div>
               <div class="detail-field">
                 <div class="detail-label">来源</div>
@@ -967,7 +967,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
               <div class="detail-title">{{ selected.title || '探索方向' }}</div>
               <div class="detail-field">
                 <div class="detail-label">编号</div>
-                <div class="detail-value">E{{ selected.edgeId }}</div>
+                <div class="detail-value">Edge {{ selected.edgeId }}</div>
               </div>
               <div class="detail-field">
                 <div class="detail-label">状态</div>
@@ -999,8 +999,8 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
               <div class="log-content">
                 <div class="log-header">
                   <span class="log-title">{{ entry.title }}</span>
-                  <span v-if="entry.type === 'node'" style="flex-shrink:0;font-size:0.65rem;font-weight:600;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:0px 3px">N{{ entry.nodeId }}</span>
-                  <span v-else-if="entry.type === 'edge'" style="flex-shrink:0;font-size:0.65rem;font-weight:600;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:0px 3px">E{{ entry.edgeId }}</span>
+                  <span v-if="entry.type === 'node'" style="flex-shrink:0;font-size:0.65rem;font-weight:600;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:0px 3px">Node {{ entry.nodeId }}</span>
+                  <span v-else-if="entry.type === 'edge'" style="flex-shrink:0;font-size:0.65rem;font-weight:600;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:0px 3px">Edge {{ entry.edgeId }}</span>
                   <span v-if="entry.type === 'complete'" class="log-tag" :style="{ background: 'rgba(60,93,255,0.12)', color: 'var(--primary)' }">结束</span>
                   <span v-else-if="entry.type === 'node'" class="log-tag" :style="{ background: entry.isTimeout ? 'rgba(239,68,68,0.12)' : entry.createdBy === 'human' ? 'rgba(79,70,229,0.12)' : entry.createdBy === 'agent' ? 'rgba(13,148,136,0.12)' : 'rgba(120,113,108,0.12)', color: entry.isTimeout ? 'var(--danger)' : entry.createdBy === 'human' ? '#4F46E5' : entry.createdBy === 'agent' ? '#0D9488' : '#78716C' }">{{ entry.isTimeout ? '超时' : entry.createdBy }}</span>
                   <span v-else class="log-tag" :style="{ background: entry.outcome === 'success' ? 'rgba(34,197,94,0.12)' : entry.outcome === 'failed' ? 'rgba(239,68,68,0.12)' : entry.status === 'running' ? 'rgba(60,93,255,0.12)' : 'rgba(148,163,184,0.12)', color: entry.outcome === 'success' ? 'var(--success)' : entry.outcome === 'failed' ? 'var(--danger)' : entry.status === 'running' ? 'var(--primary)' : 'var(--text-dim)' }">{{ entry.outcome === 'success' ? '成功' : entry.outcome === 'failed' ? '失败' : entry.status === 'running' ? '执行中' : '新方向' }}</span>
@@ -1037,21 +1037,34 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
                   <span class="timing-summary-value">{{ edgeTimingsAvgExec }}</span>
                 </div>
               </div>
-              <div class="timing-list">
-                <div v-for="t in edgeTimings" :key="t.edgeId" class="timing-row">
-                  <div class="timing-row-header">
-                    <span class="timing-edge-id">E{{ t.edgeId }}</span>
-                    <span class="timing-edge-total">{{ formatDuration(t.totalMs) }}</span>
-                  </div>
-                  <div class="timing-bar-track">
-                    <div class="timing-bar-wait" :style="{ width: t.totalMs > 0 ? barWidth(t.waitMs) : '0%' }"></div>
-                    <div class="timing-bar-exec" :style="{ width: t.totalMs > 0 ? barWidth(t.execMs) : '0%' }"></div>
-                  </div>
-                  <div class="timing-bar-labels">
-                    <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-wait"></span>等待 {{ formatDuration(t.waitMs) }}</span>
-                    <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-exec"></span>执行 {{ formatDuration(t.execMs) }}</span>
-                  </div>
-                </div>
+              <table class="timing-table">
+                <thead>
+                  <tr>
+                    <th>Edge</th>
+                    <th>等待</th>
+                    <th>执行</th>
+                    <th>总计</th>
+                    <th style="width:40%">比例</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="t in edgeTimings" :key="t.edgeId" :class="{ 'timing-row-done': t.completed }">
+                    <td class="timing-td-id">{{ t.edgeId }}</td>
+                    <td class="timing-td-val">{{ formatDuration(t.waitMs) || '—' }}</td>
+                    <td class="timing-td-val">{{ formatDuration(t.execMs) || '—' }}</td>
+                    <td class="timing-td-val timing-td-total">{{ formatDuration(t.totalMs) || '—' }}</td>
+                    <td>
+                      <div class="timing-bar-track">
+                        <div class="timing-bar-wait" :style="{ width: t.totalMs > 0 ? barWidth(t.waitMs) : '0%' }"></div>
+                        <div class="timing-bar-exec" :style="{ width: t.totalMs > 0 ? barWidth(t.execMs) : '0%' }"></div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="timing-legend">
+                <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-wait"></span>等待</span>
+                <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-exec"></span>执行</span>
               </div>
             </template>
             <div v-else class="timing-empty">暂无耗时数据</div>
