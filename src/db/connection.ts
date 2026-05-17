@@ -40,6 +40,21 @@ export function initDb() {
   // Safety: ensure settings table exists even if db:push hasn't been run
   sqlite.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)`);
 
+  // Safety: ensure reports table exists even if db:push hasn't been run
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      format TEXT NOT NULL DEFAULT 'md',
+      file_path TEXT,
+      error_message TEXT,
+      created_at TEXT NOT NULL,
+      completed_at TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    )
+  `);
+
   const existing = sqlite.prepare('SELECT COUNT(*) as count FROM settings').get() as { count: number };
   if (existing.count === 0) {
     const now = new Date().toISOString();

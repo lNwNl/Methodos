@@ -4,6 +4,7 @@ import { OpenCodeDriver } from '../driver/opencode';
 import { createLoop } from './loop';
 import { startServer } from '../api/server';
 import { loadConfigFromDb } from '../config';
+import { ensurePythonEnv } from '../report/runner';
 
 initDb();
 const db = getRawDb();
@@ -35,6 +36,10 @@ const driverFactory = (projectId: number, agentType: string) => {
 };
 
 async function main() {
+  // 检查 Python 环境
+  console.log('Checking Python environment...');
+  await ensurePythonEnv();
+
   const PORT = parseInt(process.env.PORT || '3000', 10);
   const app = await startServer(db, PORT, USE_DOCKER);
 

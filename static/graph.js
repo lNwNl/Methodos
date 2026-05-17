@@ -3,22 +3,24 @@ const projectId = params.get('id');
 
 const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
 
-const { createApp, ref, onMounted, onBeforeUnmount, nextTick } = Vue;
+    const { createApp, ref, onMounted, onBeforeUnmount, nextTick } = Vue;
 
-createApp({
-  setup() {
-    const project = ref(null);
-    const loading = ref(true);
-    const error = ref('');
-    const selected = ref(null);
-    const showPushModal = ref(false);
-    const pushNodes = ref([{ description: '' }]);
-    const panelWidth = ref(Number(localStorage.getItem('methodos-panel-width') || 320));
-    const layoutKey = ref(localStorage.getItem('methodos-layout') || 'dagre_lr');
-    const panelTab = ref(selected.value ? 'detail' : 'log');
-    const graphReady = ref(false);
-    let completedSelected = false;
-    let cy = null;
+    createApp({
+      setup() {
+        const project = ref(null);
+        const loading = ref(true);
+        const error = ref('');
+        const selected = ref(null);
+        const showPushModal = ref(false);
+        const pushNodes = ref([{ description: '' }]);
+        const panelWidth = ref(Number(localStorage.getItem('methodos-panel-width') || 320));
+        const layoutKey = ref(localStorage.getItem('methodos-layout') || 'dagre_lr');
+        const panelTab = ref(selected.value ? 'detail' : 'log');
+        const graphReady = ref(false);
+        const latestReport = ref(null);
+        const reportGenerating = ref(false);
+        let completedSelected = false;
+        let cy = null;
 
     const CY_THEME = {
       dark: {
@@ -587,6 +589,29 @@ createApp({
 
     function addNode() { pushNodes.value.push({ description: '' }); }
 
+    async function fetchLatestReport() {
+      try {
+        const r = await fetch(`/projects/${projectId}/report/latest`);
+        if (r.ok) {
+          const data = await r.json();
+          latestReport.value = data;
+          if (data && (data.status === 'pending' || data.status === 'generating')) {
+            reportGenerating.value = true;
+          } else {
+            reportGenerating.value = false;
+          }
+        }
+      } catch {}
+    }
+
+    async function generateReport() {
+      try {
+        reportGenerating.value = true;
+        await fetch(`/projects/${projectId}/report`, { method: 'POST' });
+        fetchLatestReport();
+      } catch {}
+    }
+
     function trunc(s, max) {
       if (!s) return '';
       return s.length > max ? s.slice(0, max) + '...' : s;
@@ -705,7 +730,13 @@ createApp({
 
     onMounted(() => {
       fetchProject();
-      timer = setInterval(fetchProject, 2000);
+      fetchLatestReport();
+      timer = setInterval(() => {
+        fetchProject();
+        if (reportGenerating.value) {
+          fetchLatestReport();
+        }
+      }, 2000);
     });
     onBeforeUnmount(() => {
       clearInterval(timer);
@@ -714,8 +745,9 @@ createApp({
 
     return {
       project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, panelTab, LAYOUT_NAMES, graphReady,
+      latestReport, reportGenerating,
       stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, formatTime, evidenceNodesDesc, buildLog, selectLogEntry,
-      startPanelResize, setLayout, toggleTheme,
+      startPanelResize, setLayout, toggleTheme, generateReport,
     };
   },
 
@@ -737,6 +769,32 @@ createApp({
     <template v-else-if="project">
       <div class="flex flex-1 min-h-0" style="flex:1;min-height:0;gap:0">
         <div class="graph-container flex-1" style="flex:1;min-width:0;border-right:none;position:relative">
+          <div class="graph-toolbar" style="right:0.5rem;left:auto;display:flex;gap:0.25rem">
+            <template v-if="project.status === 'completed'">
+              <button
+                v-if="!reportGenerating && (!latestReport || latestReport.status === 'completed' || latestReport.status === 'failed')"
+                class="btn btn-primary btn-sm"
+                @click="generateReport"
+              >
+                生成报告
+              </button>
+              <button
+                v-else-if="reportGenerating"
+                class="btn btn-sm"
+                disabled
+              >
+                <span class="spinner"></span> 生成中...
+              </button>
+              <a
+                v-if="latestReport && latestReport.status === 'completed'"
+                :href="'/reports/' + latestReport.id + '/download'"
+                class="btn btn-sm"
+                target="_blank"
+              >
+                下载报告
+              </a>
+            </template>
+          </div>
           <div v-if="!graphReady" class="graph-loading-overlay">
             <span class="spinner"></span>
           </div>

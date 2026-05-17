@@ -6,3 +6,8 @@ drizzle/
 .env
 .env.local
 .gitnexus
+
+# Python
+report/.venv/
+report/__pycache__/
+*.pyc

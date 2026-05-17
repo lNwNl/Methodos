@@ -413,3 +413,60 @@ export function updateSettings(db: Database.Database, settings: Record<string, s
   });
   txn();
 }
+
+// ---- Report operations ----
+
+export function createReport(
+  db: Database.Database,
+  projectId: number,
+  format: string,
+  ts: string,
+): number {
+  const result = db.prepare(`
+    INSERT INTO reports (project_id, status, format, created_at)
+    VALUES (?, 'pending', ?, ?)
+  `).run(projectId, format, ts);
+  return result.lastInsertRowid as number;
+}
+
+export function updateReportStatus(
+  db: Database.Database,
+  reportId: number,
+  status: string,
+  filePath?: string,
+  error?: string,
+): void {
+  const ts = new Date().toISOString();
+  if (status === 'completed' && filePath) {
+    db.prepare(`
+      UPDATE reports SET status = ?, file_path = ?, completed_at = ? WHERE id = ?
+    `).run(status, filePath, ts, reportId);
+  } else if (status === 'failed' && error) {
+    db.prepare(`
+      UPDATE reports SET status = ?, error_message = ?, completed_at = ? WHERE id = ?
+    `).run(status, error, ts, reportId);
+  } else {
+    db.prepare(`
+      UPDATE reports SET status = ? WHERE id = ?
+    `).run(status, reportId);
+  }
+}
+
+export function getReport(
+  db: Database.Database,
+  reportId: number,
+) {
+  return db.prepare('SELECT * FROM reports WHERE id = ?').get(reportId) as any;
+}
+
+export function getLatestReport(
+  db: Database.Database,
+  projectId: number,
+) {
+  return db.prepare(`
+    SELECT * FROM reports 
+    WHERE project_id = ? 
+    ORDER BY created_at DESC 
+    LIMIT 1
+  `).get(projectId) as any;
+}

@@ -41,3 +41,14 @@ export const edges = sqliteTable('edges', {
 }, (table) => ({
   pk: primaryKey({ columns: [table.projectId, table.id] }),
 }));
+
+export const reports = sqliteTable('reports', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull(),
+  status: text('status').notNull().default('pending'),
+  format: text('format').notNull().default('md'),
+  filePath: text('file_path'),
+  errorMessage: text('error_message'),
+  createdAt: text('created_at').notNull(),
+  completedAt: text('completed_at'),
+});

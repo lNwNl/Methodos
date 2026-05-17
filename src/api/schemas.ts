@@ -82,3 +82,14 @@ export const settingsSchema = z.object({
   snapshotMaxNodes: z.number().int().min(10).optional(),
   snapshotMaxEdges: z.number().int().min(10).optional(),
 });
+
+export const reportSchema = z.object({
+  id: z.number(),
+  project_id: z.number(),
+  status: z.enum(['pending', 'generating', 'completed', 'failed']),
+  format: z.string(),
+  file_path: z.string().nullable(),
+  error_message: z.string().nullable(),
+  created_at: z.string(),
+  completed_at: z.string().nullable(),
+});

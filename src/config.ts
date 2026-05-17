@@ -50,7 +50,7 @@ const _config: Config = {
   databasePath: process.env.DATABASE_PATH || './data/methodos.db',
   dockerSocket: process.env.DOCKER_SOCKET || '/run/user/1000/podman/podman.sock',
   agentImages: {
-    opencode: 'methodos-opencode:v1.15.3',
+    opencode: 'ghcr.io/lnwnl/methodos/opencode:latest',
     'claude-code': 'methodos-claude-code:v1.0.0',
     mock: 'test-agent:v1',
   },
