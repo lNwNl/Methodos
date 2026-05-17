@@ -30,13 +30,6 @@ RUN apt update && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
-# uv + Python packages in one layer
-ENV PATH="/root/.local/bin:/root/.venv/bin:$PATH"
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    uv venv /root/.venv && \
-    . /root/.venv/bin/activate && \
-    uv pip install pwntools
-
 # Sudo config
 RUN echo 'root ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/nopasswd && \
     chmod 440 /etc/sudoers.d/nopasswd
