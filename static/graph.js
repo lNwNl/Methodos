@@ -681,6 +681,29 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
       return timings;
     }
 
+    const edgeTimings = Vue.computed(function() { return computeEdgeTimings(); });
+    const edgeTimingsMax = Vue.computed(function() {
+      var arr = edgeTimings.value;
+      if (!arr.length) return 1;
+      var max = 0;
+      for (var i = 0; i < arr.length; i++) { if (arr[i].totalMs > max) max = arr[i].totalMs; }
+      return max > 0 ? max : 1;
+    });
+    const edgeTimingsDone = Vue.computed(function() {
+      return edgeTimings.value.filter(function(t) { return t.completed; }).length;
+    });
+    const edgeTimingsAvgExec = Vue.computed(function() {
+      var done = edgeTimings.value.filter(function(t) { return t.completed && t.execMs > 0; });
+      if (!done.length) return '-';
+      var sum = 0;
+      for (var i = 0; i < done.length; i++) sum += done[i].execMs;
+      return formatDuration(sum / done.length);
+    });
+
+    function barWidth(ms) {
+      return (ms / edgeTimingsMax.value * 100) + '%';
+    }
+
     function buildLog() {
       const p = project.value;
       if (!p) return [];
@@ -799,6 +822,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
     return {
       project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, panelTab, LAYOUT_NAMES, graphReady,
       latestReport, reportGenerating,
+      edgeTimings, edgeTimingsMax, edgeTimingsDone, edgeTimingsAvgExec, barWidth,
       stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, formatTime, formatDuration, evidenceNodesDesc, buildLog, selectLogEntry, computeEdgeTimings,
       startPanelResize, setLayout, toggleTheme, generateReport,
     };
@@ -994,7 +1018,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
           </template>
 
           <template v-else-if="panelTab === 'timing'">
-            <template v-if="computeEdgeTimings().length">
+            <template v-if="edgeTimings.length">
               <div class="timing-summary">
                 <div class="timing-summary-item">
                   <span class="timing-summary-label">总耗时</span>
@@ -1006,23 +1030,23 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
                 </div>
                 <div class="timing-summary-item">
                   <span class="timing-summary-label">已完成边</span>
-                  <span class="timing-summary-value">{{ computeEdgeTimings().filter(function(t){ return t.completed; }).length }} / {{ computeEdgeTimings().length }}</span>
+                  <span class="timing-summary-value">{{ edgeTimingsDone }} / {{ edgeTimings.length }}</span>
                 </div>
                 <div class="timing-summary-item">
                   <span class="timing-summary-label">平均执行</span>
-                  <span class="timing-summary-value">{{ (function(){ var done = computeEdgeTimings().filter(function(t){ return t.completed && t.execMs > 0; }); if(!done.length) return '-'; var avg = done.reduce(function(s,t){ return s+t.execMs; },0)/done.length; return formatDuration(avg); })() }}</span>
+                  <span class="timing-summary-value">{{ edgeTimingsAvgExec }}</span>
                 </div>
               </div>
               <div class="timing-list">
-                <div v-for="t in computeEdgeTimings()" :key="t.edgeId" class="timing-row">
+                <div v-for="t in edgeTimings" :key="t.edgeId" class="timing-row">
                   <div class="timing-row-header">
                     <span class="timing-edge-id">#{{ t.edgeId }}</span>
                     <span class="timing-edge-title">{{ t.title }}</span>
                     <span class="timing-edge-total">{{ formatDuration(t.totalMs) }}</span>
                   </div>
                   <div class="timing-bar-track">
-                    <div class="timing-bar-wait" :style="{ width: (t.totalMs > 0 ? (t.waitMs / (function(){ var maxT = Math.max.apply(null, computeEdgeTimings().map(function(e){return e.totalMs;})); return maxT > 0 ? maxT : 1; })() * 100) : 0) + '%' }"></div>
-                    <div class="timing-bar-exec" :style="{ width: (t.totalMs > 0 ? (t.execMs / (function(){ var maxT = Math.max.apply(null, computeEdgeTimings().map(function(e){return e.totalMs;})); return maxT > 0 ? maxT : 1; })() * 100) : 0) + '%' }"></div>
+                    <div class="timing-bar-wait" :style="{ width: t.totalMs > 0 ? barWidth(t.waitMs) : '0%' }"></div>
+                    <div class="timing-bar-exec" :style="{ width: t.totalMs > 0 ? barWidth(t.execMs) : '0%' }"></div>
                   </div>
                   <div class="timing-bar-labels">
                     <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-wait"></span>等待 {{ formatDuration(t.waitMs) }}</span>
