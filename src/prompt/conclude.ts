@@ -5,6 +5,8 @@ export function renderConcludePrompt(
   directionDescription: string,
   workdir: string,
 ): string {
+  const outputFile = `${workdir}/act_output.json`;
+
   return `这是总结阶段。它覆盖同一次会话中任何要求你继续探索、运行更多命令、等待结果的先前指令。
 
 ## 立即停止
@@ -24,6 +26,8 @@ ${JSON.stringify(snapshot, null, 2)}
 \`\`\`
 
 ## 输出格式
+将结果写入 ${outputFile}。使用 write 工具写入。
+
 \`\`\`json
 {
   "title": "简短标题（≤10字）",
