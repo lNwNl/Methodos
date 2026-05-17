@@ -773,14 +773,14 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
             <template v-if="project.status === 'completed'">
               <button
                 v-if="!reportGenerating && (!latestReport || latestReport.status === 'completed' || latestReport.status === 'failed')"
-                class="btn btn-primary btn-sm"
+                class="btn btn-sm btn-report"
                 @click="generateReport"
               >
                 生成报告
               </button>
               <button
                 v-else-if="reportGenerating"
-                class="btn btn-sm"
+                class="btn btn-sm btn-report"
                 disabled
               >
                 <span class="spinner"></span> 生成中...
@@ -788,7 +788,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
               <a
                 v-if="latestReport && latestReport.status === 'completed'"
                 :href="'/reports/' + latestReport.id + '/download'"
-                class="btn btn-sm"
+                class="btn btn-sm btn-report"
                 target="_blank"
               >
                 下载报告

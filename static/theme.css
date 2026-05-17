@@ -155,6 +155,8 @@ body {
 .btn-sm { padding: 0.25rem 0.55rem; font-size: 0.76rem; }
 .btn-icon { padding: 0.25rem 0.4rem; font-size: 0.9rem; line-height: 1; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-report { background: var(--primary) !important; border-color: var(--primary) !important; color: #fff !important; font-weight: 600; }
+.btn-report:hover { box-shadow: 0 0 12px var(--primary-glow); }
 
 /* Cards */
 .card {
