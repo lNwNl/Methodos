@@ -823,7 +823,11 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
           <template v-if="panelTab === 'detail'">
           <template v-if="selected">
             <template v-if="selected.type === 'ghost'">
-              <div class="detail-title">探索点 #{{ selected.edgeId }}</div>
+              <div class="detail-title">探索点</div>
+              <div class="detail-field">
+                <div class="detail-label">编号</div>
+                <div class="detail-value">#{{ selected.edgeId }}</div>
+              </div>
               <div class="detail-field">
                 <div class="detail-label">状态</div>
                 <div class="detail-value" :style="{ color: selected.status === '执行中' ? 'var(--primary)' : 'var(--text-dim)' }">{{ selected.status }}</div>
@@ -855,7 +859,11 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
             </template>
 
             <template v-else-if="selected.type === 'node'">
-              <div class="detail-title">{{ selected.title || '节点 #' + selected.nodeId }}</div>
+              <div class="detail-title">{{ selected.title || '节点' }}</div>
+              <div class="detail-field">
+                <div class="detail-label">编号</div>
+                <div class="detail-value">#{{ selected.nodeId }}</div>
+              </div>
               <div class="detail-field">
                 <div class="detail-label">来源</div>
                 <div class="detail-value">{{ selected.createdBy }}</div>
@@ -878,7 +886,11 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
             </template>
 
             <template v-else-if="selected.type === 'edge'">
-              <div class="detail-title">{{ selected.title || '探索方向 #' + selected.edgeId }}</div>
+              <div class="detail-title">{{ selected.title || '探索方向' }}</div>
+              <div class="detail-field">
+                <div class="detail-label">编号</div>
+                <div class="detail-value">#{{ selected.edgeId }}</div>
+              </div>
               <div class="detail-field">
                 <div class="detail-label">状态</div>
                 <div class="detail-value">
@@ -909,6 +921,8 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
               <div class="log-content">
                 <div class="log-header">
                   <span class="log-title">{{ entry.title }}</span>
+                  <span v-if="entry.type === 'node'" style="flex-shrink:0;font-size:0.65rem;font-weight:600;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:0px 3px">#{{ entry.nodeId }}</span>
+                  <span v-else-if="entry.type === 'edge'" style="flex-shrink:0;font-size:0.65rem;font-weight:600;color:var(--text-dim);border:1px solid var(--border);border-radius:3px;padding:0px 3px">#{{ entry.edgeId }}</span>
                   <span v-if="entry.type === 'complete'" class="log-tag" :style="{ background: 'rgba(60,93,255,0.12)', color: 'var(--primary)' }">结束</span>
                   <span v-else-if="entry.type === 'node'" class="log-tag" :style="{ background: entry.isTimeout ? 'rgba(239,68,68,0.12)' : entry.createdBy === 'human' ? 'rgba(79,70,229,0.12)' : entry.createdBy === 'agent' ? 'rgba(13,148,136,0.12)' : 'rgba(120,113,108,0.12)', color: entry.isTimeout ? 'var(--danger)' : entry.createdBy === 'human' ? '#4F46E5' : entry.createdBy === 'agent' ? '#0D9488' : '#78716C' }">{{ entry.isTimeout ? '超时' : entry.createdBy }}</span>
                   <span v-else class="log-tag" :style="{ background: entry.outcome === 'success' ? 'rgba(34,197,94,0.12)' : entry.outcome === 'failed' ? 'rgba(239,68,68,0.12)' : entry.status === 'running' ? 'rgba(60,93,255,0.12)' : 'rgba(148,163,184,0.12)', color: entry.outcome === 'success' ? 'var(--success)' : entry.outcome === 'failed' ? 'var(--danger)' : entry.status === 'running' ? 'var(--primary)' : 'var(--text-dim)' }">{{ entry.outcome === 'success' ? '成功' : entry.outcome === 'failed' ? '失败' : entry.status === 'running' ? '执行中' : '新方向' }}</span>
