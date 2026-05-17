@@ -18,7 +18,7 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
     const { title, agent_type } = parsed.data;
 
     if (agent_type === 'opencode' && !useDocker) {
-      return reply.status(400).send({ error: 'OpenCode requires Docker mode. Start with --docker flag.' });
+      return reply.status(400).send({ error: 'OpenCode requires Docker mode. Remove --mock flag.' });
     }
 
     const { config } = await import('../config');

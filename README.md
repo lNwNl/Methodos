@@ -151,9 +151,9 @@ npm install
 npm run db:push
 ```
 
-### 启动（Mock 模式）
+### 启动
 
-Mock 模式无需容器，使用内置的 MockAgentDriver 模拟 Agent 行为：
+默认为 Docker 模式，需要预先构建 Agent 镜像：
 
 ```bash
 npm run dev
@@ -161,12 +161,12 @@ npm run dev
 
 访问 `http://localhost:3000`。
 
-### 启动（Docker 模式）
+### 启动（Mock 模式）
 
-需要预先构建 Agent 镜像：
+Mock 模式无需容器，使用内置的 MockAgentDriver 模拟 Agent 行为：
 
 ```bash
-npm run dev -- --docker
+npm run dev -- --mock
 ```
 
 ### 运行测试

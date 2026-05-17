@@ -9,7 +9,7 @@ initDb();
 const db = getRawDb();
 loadConfigFromDb(db);
 
-const USE_DOCKER = process.argv.includes('--docker');
+const USE_DOCKER = !process.argv.includes('--mock');
 
 const driverFactory = (projectId: number, agentType: string) => {
   if (agentType === 'opencode' && USE_DOCKER) {
