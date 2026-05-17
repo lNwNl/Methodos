@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { renderSnapshot } from '../snapshot/render';
 import { renderPlanPrompt } from '../prompt/plan';
 import { config } from '../config';
-import { getProject, hasNewNodesSince, insertEdges, setProjectLastPlanAt, updateProject, incrementPlanRound } from '../db/operations';
+import { getProject, hasNewNodesSince, insertEdges, setProjectLastPlanAt, updateProject, incrementPlanRound, setPlanTiming } from '../db/operations';
 import type { AgentDriver, PlanOutput } from '../driver/types';
 import { z } from 'zod';
 
@@ -53,6 +53,7 @@ export function executePlan(
 
   const round = incrementPlanRound(db, projectId);
   const prompt = renderPlanPrompt(snapshot, round, '/root/workspace');
+  const planStartedAt = new Date().toISOString();
 
   return driver.executePlan({
     prompt,
@@ -60,8 +61,10 @@ export function executePlan(
     timeout: config.planTimeoutMs,
     round,
   }).then((output) => {
+    setPlanTiming(db, projectId, planStartedAt, new Date().toISOString());
     return writePlan(db, projectId, output, ts);
   }).catch((err) => {
+    setPlanTiming(db, projectId, planStartedAt, new Date().toISOString());
     const diag = (err as any).diag;
     const cat = diag?.category || 'unknown';
     // llm_transient is expected and auto-retried — use info level

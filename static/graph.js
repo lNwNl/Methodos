@@ -1021,30 +1021,30 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
             <template v-if="edgeTimings.length">
               <div class="timing-summary">
                 <div class="timing-summary-item">
-                  <span class="timing-summary-label">总耗时</span>
+                  <span class="timing-summary-label">项目总耗时</span>
                   <span class="timing-summary-value">{{ formatDuration(project.updated_at && project.created_at ? new Date(project.updated_at) - new Date(project.created_at) : 0) }}</span>
+                </div>
+                <div class="timing-summary-item">
+                  <span class="timing-summary-label">最近 Plan 耗时</span>
+                  <span class="timing-summary-value">{{ project.plan_started_at && project.plan_completed_at ? formatDuration(new Date(project.plan_completed_at) - new Date(project.plan_started_at)) : '—' }}</span>
                 </div>
                 <div class="timing-summary-item">
                   <span class="timing-summary-label">Plan 轮次</span>
                   <span class="timing-summary-value">{{ project.plan_round || 0 }}</span>
                 </div>
                 <div class="timing-summary-item">
-                  <span class="timing-summary-label">已完成边</span>
+                  <span class="timing-summary-label">已完成 / 总边数</span>
                   <span class="timing-summary-value">{{ edgeTimingsDone }} / {{ edgeTimings.length }}</span>
-                </div>
-                <div class="timing-summary-item">
-                  <span class="timing-summary-label">平均执行</span>
-                  <span class="timing-summary-value">{{ edgeTimingsAvgExec }}</span>
                 </div>
               </div>
               <table class="timing-table">
                 <thead>
                   <tr>
                     <th>Edge</th>
-                    <th>等待</th>
+                    <th>排队</th>
                     <th>执行</th>
                     <th>总计</th>
-                    <th style="width:40%">比例</th>
+                    <th style="width:40%">占比</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1063,8 +1063,8 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
                 </tbody>
               </table>
               <div class="timing-legend">
-                <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-wait"></span>等待</span>
-                <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-exec"></span>执行</span>
+                <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-wait"></span>排队（Plan 创建 → Agent 接手）</span>
+                <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-exec"></span>执行（Agent 接手 → 产出结果）</span>
               </div>
             </template>
             <div v-else class="timing-empty">暂无耗时数据</div>

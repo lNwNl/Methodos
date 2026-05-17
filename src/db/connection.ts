@@ -87,6 +87,10 @@ export function initDb() {
     );
   `);
 
+  // Migration: add plan timing columns if missing
+  try { db.exec(`ALTER TABLE projects ADD COLUMN plan_started_at TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE projects ADD COLUMN plan_completed_at TEXT`); } catch {}
+
   const existing = db.prepare('SELECT COUNT(*) as count FROM settings').get() as { count: number };
   if (existing.count === 0) {
     const now = new Date().toISOString();

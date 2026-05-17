@@ -318,6 +318,18 @@ export function setProjectLastPlanAt(
   `).run(ts, ts, projectId);
 }
 
+export function setPlanTiming(
+  db: Database.Database,
+  projectId: number,
+  startedAt: string,
+  completedAt: string,
+) {
+  db.prepare(`
+    UPDATE projects SET plan_started_at = ?, plan_completed_at = ?, updated_at = ?
+    WHERE id = ?
+  `).run(startedAt, completedAt, completedAt, projectId);
+}
+
 export function listProjects(db: Database.Database) {
   return db.prepare(`
     SELECT
