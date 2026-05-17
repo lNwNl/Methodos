@@ -895,7 +895,6 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
           <div class="panel-tabs">
             <button class="panel-tab" :class="{ active: panelTab === 'detail' }" @click="panelTab = 'detail'">详情</button>
             <button class="panel-tab" :class="{ active: panelTab === 'log' }" @click="panelTab = 'log'">日志</button>
-            <button class="panel-tab" :class="{ active: panelTab === 'timing' }" @click="panelTab = 'timing'">耗时</button>
           </div>
 
           <template v-if="panelTab === 'detail'">
@@ -994,6 +993,12 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
 
           <template v-else>
           <div class="log-list" v-if="buildLog().length">
+            <div v-if="edgeTimings.length" class="log-summary">
+              <span class="log-summary-item">总耗时 <b>{{ formatDuration(project.updated_at && project.created_at ? new Date(project.updated_at) - new Date(project.created_at) : 0) }}</b></span>
+              <span class="log-summary-item">轮次 <b>{{ project.plan_round || 0 }}</b></span>
+              <span class="log-summary-item">完成 <b>{{ edgeTimingsDone }}/{{ edgeTimings.length }}</b></span>
+              <span class="log-summary-item">均耗 <b>{{ edgeTimingsAvgExec }}</b></span>
+            </div>
             <div v-for="entry in buildLog()" :key="entry.type + '_' + (entry.nodeId || entry.edgeId) + '_' + entry.time" class="log-entry" @click="selectLogEntry(entry)">
               <div class="log-dot" :style="{ background: entry.type === 'complete' ? 'var(--primary)' : entry.type === 'node' ? (entry.isTimeout ? 'var(--danger)' : entry.createdBy === 'human' ? '#4F46E5' : entry.createdBy === 'agent' ? '#0D9488' : '#78716C') : entry.outcome === 'success' ? 'var(--success)' : entry.outcome === 'failed' ? 'var(--danger)' : entry.status === 'running' ? 'var(--primary)' : 'var(--text-dim)' }"></div>
               <div class="log-content">
@@ -1010,52 +1015,15 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
                 <div class="log-desc" v-else-if="entry.type !== 'complete'">{{ entry.description }}</div>
                 <div v-if="entry.fromDesc" class="log-desc" style="font-size:0.7rem;opacity:0.6">来自: {{ entry.fromDesc }}</div>
                 <div v-if="entry.failureCount > 0" class="log-desc" style="color:var(--danger);font-size:0.7rem">失败 {{ entry.failureCount }} 次</div>
+                <div v-if="entry.type === 'edge' && entry.duration > 0" class="log-bar-track">
+                  <div class="log-bar-wait" :style="{ width: (function(){ var t = edgeTimings.find(function(et){return et.edgeId===entry.edgeId;}); return t && t.totalMs > 0 ? barWidth(t.waitMs) : '0%'; })() }"></div>
+                  <div class="log-bar-exec" :style="{ width: (function(){ var t = edgeTimings.find(function(et){return et.edgeId===entry.edgeId;}); return t && t.totalMs > 0 ? barWidth(t.execMs) : '0%'; })() }"></div>
+                </div>
                 <div class="log-time">{{ formatTime(entry.time) }}</div>
               </div>
             </div>
           </div>
           <div v-else class="detail-panel-empty">暂无日志</div>
-          </template>
-
-          <template v-if="panelTab === 'timing'">
-            <template v-if="edgeTimings.length">
-              <div class="timing-summary">
-                <div class="timing-summary-item">
-                  <span class="timing-summary-label">总耗时</span>
-                  <span class="timing-summary-value">{{ formatDuration(project.updated_at && project.created_at ? new Date(project.updated_at) - new Date(project.created_at) : 0) }}</span>
-                </div>
-                <div class="timing-summary-item">
-                  <span class="timing-summary-label">Plan 轮次</span>
-                  <span class="timing-summary-value">{{ project.plan_round || 0 }}</span>
-                </div>
-                <div class="timing-summary-item">
-                  <span class="timing-summary-label">已完成边</span>
-                  <span class="timing-summary-value">{{ edgeTimingsDone }} / {{ edgeTimings.length }}</span>
-                </div>
-                <div class="timing-summary-item">
-                  <span class="timing-summary-label">平均执行</span>
-                  <span class="timing-summary-value">{{ edgeTimingsAvgExec }}</span>
-                </div>
-              </div>
-              <div class="timing-list">
-                <div v-for="t in edgeTimings" :key="t.edgeId" class="timing-row">
-                  <div class="timing-row-header">
-                    <span class="timing-edge-id">#{{ t.edgeId }}</span>
-                    <span class="timing-edge-title">{{ t.title }}</span>
-                    <span class="timing-edge-total">{{ formatDuration(t.totalMs) }}</span>
-                  </div>
-                  <div class="timing-bar-track">
-                    <div class="timing-bar-wait" :style="{ width: t.totalMs > 0 ? barWidth(t.waitMs) : '0%' }"></div>
-                    <div class="timing-bar-exec" :style="{ width: t.totalMs > 0 ? barWidth(t.execMs) : '0%' }"></div>
-                  </div>
-                  <div class="timing-bar-labels">
-                    <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-wait"></span>等待 {{ formatDuration(t.waitMs) }}</span>
-                    <span class="timing-bar-label"><span class="timing-bar-label-dot timing-legend-exec"></span>执行 {{ formatDuration(t.execMs) }}</span>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <div v-else class="timing-empty">暂无耗时数据</div>
           </template>
         </div>
       </div>
