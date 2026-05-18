@@ -334,3 +334,7 @@ interface AgentDriver {
 ## 许可证
 
 [GNU Affero General Public License v3.0](LICENSE)
+
+## 致谢
+
+感谢 [小米 MiMo](https://100t.xiaomimimo.com/) 百万亿 Token 创造者激励计划提供的 Token Plan 支持。
