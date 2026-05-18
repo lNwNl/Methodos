@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { access, mkdir } from 'node:fs/promises';
 
 const REPORT_DIR = join(process.cwd(), 'report');
@@ -50,6 +50,7 @@ export async function generateReport(params: {
   onError: (error: string) => void;
 }): Promise<void> {
   const { projectId, reportId, dbPath, env: extraEnv, onComplete, onError } = params;
+  const absDbPath = resolve(dbPath);
 
   const outputDir = join(process.cwd(), 'data', 'reports', String(projectId));
   await mkdir(outputDir, { recursive: true });
@@ -60,7 +61,7 @@ export async function generateReport(params: {
     'run', 'methodos-report',
     '--project-id', String(projectId),
     '--output', outputFile,
-    '--db-path', dbPath,
+    '--db-path', absDbPath,
   ], {
     cwd: REPORT_DIR,
     stdio: ['pipe', 'pipe', 'pipe'],
