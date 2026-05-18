@@ -6,21 +6,66 @@
 
 ### 与 Cairn 的主要差异
 
-| 维度 | Cairn | Methodos |
-|------|-------|----------|
-| 语言与技术栈 | Python + FastAPI + Uvicorn | TypeScript + Fastify + Node.js |
-| 进程模型 | 双进程：Server（图谱状态）+ Dispatcher（调度执行），通过 HTTP 通信 | 单进程：Executor Loop 统一调度与执行 |
-| 图谱抽象 | 三原语：Fact（事实）、Intent（意图）、Hint（提示） | 两原语：Node（节点）、Edge（边） |
-| Agent 协作模式 | Stigmergy（信息素协作）—— Agent 通过共享图谱间接协调，无直接通信 | 优先级调度 —— 系统按边的优先级分配任务，支持并发执行 |
-| 调度策略 | 轮询（Round-Robin）+ 租约（Lease）心跳机制防止重复执行 | 动态优先级计算：成功提升、失败惩罚、时间衰减 + Claimed 过期机制 |
-| 执行循环 | 三任务类型：Bootstrap → Reason → Explore（OODA 循环） | Plan-Act-Conclude 循环，支持两种 Plan 触发模式（edge_drain / node_created） |
-| Agent 驱动 | Worker Adapter 模式（Claude Code、Codex、Pi） | AgentDriver 接口（OpenCode Agent、Mock） |
-| 容器管理 | Dispatcher 统一管理，Agent 不直接调用 API | Executor 直接通过 Podman/Docker CLI 管理容器 |
-| Web UI | 无内置 Web UI | 内置 Vue 3 + Cytoscape.js 图谱可视化界面（项目列表、图谱详情、设置管理） |
-| 报告生成 | 无内置报告功能 | 内置 LLM 驱动的渗透测试报告生成（Python + LangGraph，输出 Markdown/HTML/PDF） |
-| 输出校验 | Contracts 模式校验 Agent JSON 输出 | validateAndFix 机制 —— 校验失败时自动重试引导 Agent 修正格式 |
-| 数据库 | SQLite（WAL 模式） | SQLite（better-sqlite3） |
-| 通用性定位 | 通用问题求解引擎，渗透测试是首个验证领域 | 专注自动化渗透测试编排 |
+#### 进程架构
+
+Cairn 采用**双进程架构**：Server（FastAPI）维护图谱状态，Dispatcher（调度器）通过 HTTP API 读写图谱、调度任务、管理容器。Dispatcher 是图谱的唯一写入者，Agent 从不直接调用 API。
+
+Methodos 采用**单进程架构**：Fastify HTTP Server 与 Executor Loop（tick-based 调度器）运行在同一进程中，直接通过 `better-sqlite3` 读写数据库，无进程间通信开销。
+
+#### 图谱模型
+
+Cairn 使用**三原语**：Fact（已确认的事实，不可变）、Intent（探索方向，通过心跳租约认领）、Hint（人工注入的提示）。Fact 一旦创建不可修改；Intent 通过 `worker` 字段和 heartbeat 机制实现租约式并发控制。
+
+Methodos 使用**两原语**：Node（发现/事实，来源分为 human/agent/system）和 Edge（探索方向，含 `from_node_ids`、`to_node_ids`、`direction_description`、`priority`、`failure_count`、`claimed_at`）。Edge 是可变的——每次执行后其优先级会动态调整，`claimed_at` 通过过期机制防止永久锁定。
+
+#### 执行循环
+
+Cairn 的 Dispatcher 按图谱状态选择任务类型，通过 `reason_checkpoints` 追踪图谱变化决定何时触发 Reason：
+- **Bootstrap**：项目初始化时尝试直接解决问题
+- **Reason**：读取完整图谱 YAML，分析目标是否达成，提出新的 Intent 或判定完成
+- **Explore**：认领一个 Intent，执行探索，产出一个 Fact
+
+Methodos 的 Executor Loop 在每个 tick 遍历活跃项目，按条件触发 Plan 或 Act：
+- **Plan**：将图谱 JSON 快照发送给 LLM，LLM 分析后输出新的 Edge 定义（`direction_description`）和完成判定。支持两种触发模式：`edge_drain`（所有边执行完毕后触发）和 `node_created`（有新节点即触发）
+- **Act**：按优先级认领一条未执行的 Edge，将 `direction_description` 发送给容器内的 Agent 执行。超时后触发 **Conclude** 阶段，在同一会话中要求 Agent 基于已有信息总结发现
+
+#### LLM 交互方式
+
+Cairn 的 Dispatcher 将 prompt 交给 Worker Adapter（如 `claude` CLI），由 Adapter 构建命令行参数在容器内执行，Agent 的输出通过 stdout 返回，Dispatcher 解析 stdout 提取结构化 JSON。Agent 不感知 Cairn 的存在。
+
+Methodos 的 Executor 将 prompt 写入容器内的文件，调用 `opencode run` CLI 执行，Agent 将结果写入指定的输出文件（如 `act_output.json`、`plan_output_round_N.json`）。Executor 读取文件并校验 JSON 格式，若校验失败则通过 **validateAndFix** 机制自动重试——向 Agent 发送修正提示，引导其补全或修正输出文件，最多重试 `maxValidationRetries` 次。
+
+#### 调度与并发
+
+Cairn 的 Dispatcher 使用 ThreadPoolExecutor 并发调度，通过 Worker 优先级排序 + 容量限制（`max_running`）+ 健康检查窗口 + 拒绝窗口进行 Worker 选择。每个 Intent 通过 heartbeat 租约防止重复认领。每个项目可有多个 Explore 任务并发执行（不同 Intent）。
+
+Methodos 的 Executor 使用异步 tick 循环，每个项目同一时间最多一个 Plan（`planInFlight`），最多 `maxActConcurrency`（默认 3）个 Act 并发执行。边的调度支持两种算法：`priority`（按优先级排序）和 `random`（随机选择）。优先级动态计算：成功执行 → ×1.2 提升，失败 → ×0.9 惩罚，随时间每小时衰减 1%。
+
+#### 容器与 Agent
+
+Cairn 的每个项目分配一个 Worker Container（Kali Linux），容器内可并发运行多个 Agent Worker。Dispatcher 管理容器生命周期（创建、启停、清理），支持 Claude Code、Codex、Pi 三种 Worker Adapter，每种 Adapter 构建不同的 CLI 命令。
+
+Methodos 的每个项目分配一个容器（Kali Linux + OpenCode AI），容器内串行执行 Agent 任务。`OpenCodeDriver` 通过 `opencode run --format json --dangerously-skip-permissions` 调用 Agent，将 LLM Provider/Model 配置注入容器内的 `opencode.json`。支持 `MockAgentDriver` 用于无容器测试。
+
+#### Prompt 设计
+
+Cairn 的 prompt 模板存放在 Markdown 文件中（`bootstrap.md`、`reason.md`、`explore.md`），使用 `{placeholder}` 变量。Reason prompt 包含完整图谱 YAML 和开放 Intent 列表，Explore prompt 包含图谱 YAML 和具体 Intent 描述。
+
+Methodos 的 prompt 由 TypeScript 函数渲染，Plan prompt 包含完整图谱 JSON 快照并要求 LLM 输出 `{edges, complete, summary, evidence_node_ids}` 格式；Act prompt 包含图谱快照和具体 `direction_description`，要求 Agent 输出 `{title, description}` 格式。Conclude prompt 明确禁止运行任何命令，仅允许总结已有发现。prompt 中包含速率控制规则（nmap -T3、gobuster -t 1 等）。
+
+#### 内置功能
+
+Cairn 是 API-only 设计，无内置 Web UI 和报告功能。
+
+Methodos 内置：
+- **Web UI**：Vue 3 + Cytoscape.js 图谱可视化（多种布局算法：dagre、breadthfirst、concentric 等）、项目管理、设置页面、暗色/亮色主题
+- **报告生成**：Python 子进程（`uv run methodos-report`）通过 LangGraph 工作流生成渗透测试报告（Markdown/HTML/PDF）
+
+#### 通用性定位
+
+Cairn 定位为**通用问题求解引擎**——给定 origin 和 goal，搜索未知状态空间中的路径。渗透测试是首个验证领域，但架构不限于此。
+
+Methodos 专注**自动化渗透测试编排**，prompt 中内置了安全测试专用的速率控制、扫描策略等规则。
 
 ## 架构概览
 
