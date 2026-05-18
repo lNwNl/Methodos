@@ -5,8 +5,7 @@ Methodos 渗透测试报告生成模块，基于 LangGraph 实现。
 ## 功能特性
 
 - **LangGraph 工作流** — 攻击路径和漏洞分析并行生成
-- **双接口** — HTTP API + CLI
-- **多格式输出** — Markdown（默认）、HTML、PDF
+- **多格式输出** — Markdown、HTML、PDF
 - **可配置 LLM** — 支持 OpenAI、Anthropic、Ollama
 
 ## 快速开始
@@ -14,11 +13,7 @@ Methodos 渗透测试报告生成模块，基于 LangGraph 实现。
 ### 安装
 
 ```bash
-# 克隆项目
-git clone <repo-url>
-cd methodos-report
-
-# 安装依赖
+cd report
 uv sync
 
 # 配置环境变量
@@ -26,35 +21,23 @@ cp .env.example .env
 # 编辑 .env 填入 API Key
 ```
 
-### 使用 CLI
+### 使用
 
 ```bash
 # 生成 Markdown 报告
 uv run methodos-report generate --project-id 1 --output report.md
 
-# 生成 PDF 报告
-uv run methodos-report generate --project-id 1 --output report.pdf
-
 # 生成 HTML 报告
 uv run methodos-report generate --project-id 1 --output report.html
+
+# 生成 PDF 报告
+uv run methodos-report generate --project-id 1 --output report.pdf
 
 # 指定数据库路径
 uv run methodos-report generate --project-id 1 --db-path /path/to/methodos.db --output report.md
 ```
 
-支持的格式：`.md`、`.html`、`.pdf`（从文件后缀自动推断）
-
-### 启动 HTTP 服务
-
-```bash
-# 启动服务
-uv run uvicorn methodos_report.api:app --host 0.0.0.0 --port 8001
-
-# 调用 API
-curl -X POST http://localhost:8001/projects/1/report \
-  -H "Content-Type: application/json" \
-  -d '{"output": "data/reports/1/report.md"}'
-```
+格式从文件后缀自动推断（`.md`、`.html`、`.pdf`）。
 
 ## 配置
 
@@ -69,8 +52,56 @@ curl -X POST http://localhost:8001/projects/1/report \
 | `OLLAMA_BASE_URL` | Ollama 地址 | `http://localhost:11434` |
 | `MODEL_NAME` | 模型名称 | `gpt-4o` |
 | `TEMPERATURE` | 温度参数 | `0.7` |
-| `API_HOST` | 服务监听地址 | `0.0.0.0` |
-| `API_PORT` | 服务端口 | `8001` |
+| `DEFAULT_DB_PATH` | 默认数据库路径 | `data/methodos.db` |
+
+所有环境变量支持 `REPORT_` 前缀（如 `REPORT_LLM_PROVIDER`），优先级更高。
+
+## 架构
+
+```
+┌──────────┐
+│ collect  │ 读取 SQLite，填充 nodes/edges
+└────┬─────┘
+     │
+     ├──────────────────────┬────────────────────
+     ▼                      ▼
+┌──────────────┐    ┌──────────────┐
+│ attack_path  │    │ vuln_analysis│
+│ (LLM)        │    │ (LLM)        │
+│ 生成攻击路径  │    │ 生成漏洞分析  │
+└──────┬───────┘    └──────┬───────┘
+       │                   │
+       └────────┬──────────┘
+                ▼
+         ┌──────────┐
+         │  format  │ 拼接模板 + 格式转换
+         └──────────┘
+```
+
+### 项目结构
+
+```
+report/
+├── pyproject.toml
+├── .env.example
+├── methodos_report/
+│   ├── __init__.py
+│   ├── cli.py                  # CLI 入口
+│   ├── config.py               # 配置管理
+│   ├── core/
+│   │   ├── report.py           # 报告生成入口
+│   │   ├── graph.py            # LangGraph 工作流定义
+│   │   ├── state.py            # 状态类型定义
+│   │   ├── format.py           # 格式转换（MD→HTML/PDF）
+│   │   └── nodes/
+│   │       ├── collect.py      # 数据收集节点
+│   │       ├── attack_path.py  # 攻击路径生成
+│   │       └── vuln_analysis.py # 漏洞分析生成
+│   └── templates/
+│       ├── report.md           # Markdown 模板
+│       └── report.html         # HTML 模板
+└── tests/
+```
 
 ## 开发
 
@@ -84,7 +115,3 @@ uv run ruff format
 # 类型检查
 uv run mypy methodos_report
 ```
-
-## 许可证
-
-MIT

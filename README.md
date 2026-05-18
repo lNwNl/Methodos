@@ -318,6 +318,6 @@ interface AgentDriver {
 }
 ```
 
-## 许可
+## 许可证
 
-私有项目，未公开发布。
+[GNU Affero General Public License v3.0](LICENSE)
