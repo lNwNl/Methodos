@@ -82,11 +82,14 @@ jobs:
           
           echo "Owner: ${OWNER}, Repo: ${REPO_NAME}"
           
+          # GHCR API package name (URL-encode slashes)
+          PACKAGE_NAME="${REPO_NAME}%2Fopencode"
+          
           # Determine API endpoint based on owner type
           if [ "${{ github.repository_owner_type }}" = "Organization" ]; then
-            API_BASE="/orgs/${OWNER}/packages/container/${REPO_NAME}/opencode"
+            API_BASE="/orgs/${OWNER}/packages/container/${PACKAGE_NAME}"
           else
-            API_BASE="/user/packages/container/${REPO_NAME}/opencode"
+            API_BASE="/user/packages/container/${PACKAGE_NAME}"
           fi
           
           echo "API endpoint: ${API_BASE}"
