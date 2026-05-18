@@ -2,6 +2,26 @@
 
 自动化渗透测试编排系统。通过 Plan-Act 循环驱动 LLM Agent 自主执行安全测试任务，以有向图（探索图谱）建模探索过程，支持多 Agent 并行执行与优先级调度。
 
+> 本项目受 [Cairn](https://github.com/oritera/Cairn) 启发。Cairn 是一个基于事实-意图图谱（Fact-Intent Graph）的通用问题求解引擎，采用 Blackboard Architecture 与 Stigmergy 协作模式，在腾讯云黑客松 AI 渗透测试挑战赛中取得了 610 支队伍中唯一 AK（All Kill）的成绩。Methodos 借鉴了 Cairn 的核心思想——以图谱建模探索过程、通过 LLM Agent 自主驱动安全测试——同时在架构设计、技术栈和交互方式上做了不同的选择。
+
+### 与 Cairn 的主要差异
+
+| 维度 | Cairn | Methodos |
+|------|-------|----------|
+| 语言与技术栈 | Python + FastAPI + Uvicorn | TypeScript + Fastify + Node.js |
+| 进程模型 | 双进程：Server（图谱状态）+ Dispatcher（调度执行），通过 HTTP 通信 | 单进程：Executor Loop 统一调度与执行 |
+| 图谱抽象 | 三原语：Fact（事实）、Intent（意图）、Hint（提示） | 两原语：Node（节点）、Edge（边） |
+| Agent 协作模式 | Stigmergy（信息素协作）—— Agent 通过共享图谱间接协调，无直接通信 | 优先级调度 —— 系统按边的优先级分配任务，支持并发执行 |
+| 调度策略 | 轮询（Round-Robin）+ 租约（Lease）心跳机制防止重复执行 | 动态优先级计算：成功提升、失败惩罚、时间衰减 + Claimed 过期机制 |
+| 执行循环 | 三任务类型：Bootstrap → Reason → Explore（OODA 循环） | Plan-Act-Conclude 循环，支持两种 Plan 触发模式（edge_drain / node_created） |
+| Agent 驱动 | Worker Adapter 模式（Claude Code、Codex、Pi） | AgentDriver 接口（OpenCode Agent、Mock） |
+| 容器管理 | Dispatcher 统一管理，Agent 不直接调用 API | Executor 直接通过 Podman/Docker CLI 管理容器 |
+| Web UI | 无内置 Web UI | 内置 Vue 3 + Cytoscape.js 图谱可视化界面（项目列表、图谱详情、设置管理） |
+| 报告生成 | 无内置报告功能 | 内置 LLM 驱动的渗透测试报告生成（Python + LangGraph，输出 Markdown/HTML/PDF） |
+| 输出校验 | Contracts 模式校验 Agent JSON 输出 | validateAndFix 机制 —— 校验失败时自动重试引导 Agent 修正格式 |
+| 数据库 | SQLite（WAL 模式） | SQLite（better-sqlite3） |
+| 通用性定位 | 通用问题求解引擎，渗透测试是首个验证领域 | 专注自动化渗透测试编排 |
+
 ## 架构概览
 
 ```
