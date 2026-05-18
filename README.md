@@ -58,6 +58,10 @@ Plan 和 Act 执行后，Agent 输出的 JSON 会经过校验。若输出文件�
    - `complete: true` — 目标达成或探索穷尽，项目结束
    - `complete: false` + 新 edges — 继续探索
    - `complete: false` + 空 edges — 卡住，项目标记为 failed
+
+   Plan 触发模式（`planTriggerMode`）：
+   - `edge_drain`（默认）— 所有边均已产出结果后才触发下一轮 Plan
+   - `node_created` — 有新节点即触发 Plan
 2. **Act（执行）**：从待探索边中按优先级认领一条，将方向描述发送给 LLM Agent 在容器内执行实际操作（扫描、枚举、利用等）。
 3. **Conclude（总结）**：当 Act 超时时，触发总结阶段，要求 Agent 基于已有信息产出结果。
 
@@ -132,8 +136,10 @@ src/
 static/
 ├── index.html             # 首页（项目列表）
 ├── project.html           # 项目详情页（图谱可视化）
+├── settings.html          # 设置页面（通用 + 报告 + Agent 配置）
 ├── app.js                 # 首页 Vue 应用
 ├── graph.js               # 图谱可视化 Vue 应用 + Cytoscape 集成
+├── settings.js            # 设置页面 Vue 应用
 └── theme.css              # 全局样式（暗色/亮色主题）
 
 docker/
@@ -198,6 +204,7 @@ npm run typecheck
 | 配置项               | 环境变量               | 默认值     | 说明                         |
 | -------------------- | ---------------------- | ---------- | ---------------------------- |
 | `actTimeoutMs`       | `ACT_TIMEOUT_MS`       | 600000     | Act 执行超时（ms）           |
+| `concludeTimeoutMs`  | `CONCLUDE_TIMEOUT_MS`  | 300000     | Conclude 执行超时（ms）      |
 | `planTimeoutMs`      | `PLAN_TIMEOUT_MS`      | 600000     | Plan 执行超时（ms）          |
 | `claimedExpiryMs`    | —                      | 1800000    | 边认领过期时间（ms）         |
 | `tickIntervalMs`     | —                      | 1000       | 调度循环间隔（ms）           |
@@ -207,9 +214,19 @@ npm run typecheck
 | `snapshotMaxEdges`   | `SNAPSHOT_MAX_EDGES`   | 200        | 快照最大边数                 |
 | `maxValidationRetries` | `MAX_VALIDATION_RETRIES` | 3       | Agent 输出校验重试次数       |
 | `planMinIntervalMs`  | —                      | 5000       | Plan 最小间隔（ms）          |
+| `planTriggerMode`    | `PLAN_TRIGGER_MODE`    | edge_drain | Plan 触发模式（edge_drain / node_created） |
 | `priorityBoostSuccess` | —                    | 1.2        | 成功后优先级乘数             |
 | `priorityPenaltyFailure` | —                   | 0.9        | 失败后优先级乘数             |
 | `priorityDecayRateHourly` | —                  | 0.01       | 优先级每小时衰减率           |
+
+Agent 配置通过 `/settings/agent` API 或数据库 settings 表设置：
+
+| 配置项           | 说明                         |
+| ---------------- | ---------------------------- |
+| `agentProvider`  | Agent LLM 提供商             |
+| `agentApiKey`    | Agent API Key                |
+| `agentBaseURL`   | Agent 兼容 Base URL          |
+| `agentModel`     | Agent 模型名称               |
 
 数据库路径通过 `DATABASE_PATH` 环境变量配置（默认 `./data/methodos.db`）。
 
@@ -251,10 +268,12 @@ GitHub Actions 自动构建 Docker 镜像并推送至 GitHub Container Registry 
 | `GET`  | `/projects/:id/edges`         | 获取边状态列表                     |
 | `GET`  | `/settings`                   | 获取当前设置                       |
 | `PUT`  | `/settings`                   | 更新设置                           |
-| `POST` | `/projects/:id/report`        | 触发报告生成（项目需已完成）       |
-| `GET`  | `/projects/:id/report/latest` | 获取最近报告状态                   |
 | `GET`  | `/settings/report`            | 获取报告配置（敏感字段脱敏）       |
 | `PUT`  | `/settings/report`            | 更新报告配置                       |
+| `GET`  | `/settings/agent`             | 获取 Agent 配置（敏感字段脱敏）    |
+| `PUT`  | `/settings/agent`             | 更新 Agent 配置                    |
+| `POST` | `/projects/:id/report`        | 触发报告生成（项目需已完成）       |
+| `GET`  | `/projects/:id/report/latest` | 获取最近报告状态                   |
 | `GET`  | `/reports/:id/download`       | 下载报告文件（Markdown）           |
 
 ## Agent Driver 接口
