@@ -187,7 +187,7 @@ Docker 模式需要预拉取 Agent 容器镜像：
 
 ```bash
 # 拉取 OpenCode Agent 镜像
-podman pull ghcr.io/lNwNl/methodos/opencode:latest
+podman pull ghcr.io/lnwnl/methodos/opencode:latest
 ```
 
 如使用 Docker，需设置环境变量：
