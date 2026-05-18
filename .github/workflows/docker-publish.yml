@@ -82,12 +82,25 @@ jobs:
           
           echo "Cleaning up package: ${PACKAGE_NAME}"
           
+          # Determine API endpoint based on owner type
+          OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1 | tr '[:upper:]' '[:lower:]')
+          if [ "${{ github.repository_owner_type }}" = "Organization" ]; then
+            API_BASE="/orgs/${OWNER}/packages/container/${PACKAGE_NAME}"
+          else
+            API_BASE="/user/packages/container/${PACKAGE_NAME}"
+          fi
+          
           # Get all versions sorted by created_at descending, skip first 2
           VERSIONS=$(gh api \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "/user/packages/container/${PACKAGE_NAME}/versions?per_page=100" \
-            --jq 'sort_by(.created_at) | reverse | .[2:] | .[].id')
+            "${API_BASE}/versions?per_page=100" \
+            --jq 'sort_by(.created_at) | reverse | .[2:] | .[].id' 2>/dev/null || echo "")
+          
+          if [ -z "$VERSIONS" ]; then
+            echo "No versions to clean up or package not found"
+            exit 0
+          fi
           
           # Delete versions beyond the latest 2
           for VERSION_ID in $VERSIONS; do
@@ -96,5 +109,5 @@ jobs:
               --method DELETE \
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              "/user/packages/container/${PACKAGE_NAME}/versions/${VERSION_ID}" || true
+              "${API_BASE}/versions/${VERSION_ID}" || true
           done

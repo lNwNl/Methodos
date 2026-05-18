@@ -1,4 +1,4 @@
-FROM --platform=amd64 kalilinux/kali-rolling:latest
+FROM kalilinux/kali-rolling:latest
 
 # Single layer: apt packages + Node.js + opencode + sudo config
 RUN apt-get update && \
