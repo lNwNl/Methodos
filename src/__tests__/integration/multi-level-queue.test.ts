@@ -79,31 +79,37 @@ describe('Multi-level Feedback Queue Integration', () => {
 
   describe('Plan Trigger Logic', () => {
     it('should trigger plan when new nodes exist regardless of unresulted edges', () => {
-      const now = new Date().toISOString();
-      const projectId = createProject(db, 'test project', 'mock', 'mock:v1', now);
+      const originalMode = config.planTriggerMode;
+      config.planTriggerMode = 'node_created';
+      try {
+        const now = new Date().toISOString();
+        const projectId = createProject(db, 'test project', 'mock', 'mock:v1', now);
 
-      // Set last_plan_at to a past time
-      const pastTime = new Date(Date.now() - 10000).toISOString();
-      setProjectLastPlanAt(db, projectId, pastTime);
+        // Set last_plan_at to a past time
+        const pastTime = new Date(Date.now() - 10000).toISOString();
+        setProjectLastPlanAt(db, projectId, pastTime);
 
-      // Insert edges (creates unresulted edges)
-      insertEdges(db, projectId, [
-        { from_node_ids: [1], direction_description: 'scan ports' },
-        { from_node_ids: [1], direction_description: 'enum subdomains' },
-      ], now);
+        // Insert edges (creates unresulted edges)
+        insertEdges(db, projectId, [
+          { from_node_ids: [1], direction_description: 'scan ports' },
+          { from_node_ids: [1], direction_description: 'enum subdomains' },
+        ], now);
 
-      // Verify unresulted edges exist
-      const edge1 = getEdge(db, projectId, 1);
-      expect(edge1).not.toBeNull();
-      expect(edge1!.to_node_ids).toEqual([]);
+        // Verify unresulted edges exist
+        const edge1 = getEdge(db, projectId, 1);
+        expect(edge1).not.toBeNull();
+        expect(edge1!.to_node_ids).toEqual([]);
 
-      // Insert a new node (simulating agent work)
-      const newTime = new Date(Date.now() + 1000).toISOString();
-      insertNode(db, projectId, null, 'New finding from scan', 'agent', 1, newTime);
+        // Insert a new node (simulating agent work)
+        const newTime = new Date(Date.now() + 1000).toISOString();
+        insertNode(db, projectId, null, 'New finding from scan', 'agent', 1, newTime);
 
-      // Should trigger plan because new nodes exist
-      const result = shouldTriggerPlan(db, projectId);
-      expect(result).toBe(true);
+        // Should trigger plan because new nodes exist (node_created mode)
+        const result = shouldTriggerPlan(db, projectId);
+        expect(result).toBe(true);
+      } finally {
+        config.planTriggerMode = originalMode;
+      }
     });
 
     it('should not trigger plan when no new nodes exist', () => {
@@ -349,61 +355,67 @@ describe('Multi-level Feedback Queue Integration', () => {
 
   describe('Complete Workflow', () => {
     it('should handle full plan-act cycle', () => {
-      const now = new Date().toISOString();
-      const projectId = createProject(db, 'test project', 'mock', 'mock:v1', now);
+      const originalMode = config.planTriggerMode;
+      config.planTriggerMode = 'node_created';
+      try {
+        const now = new Date().toISOString();
+        const projectId = createProject(db, 'test project', 'mock', 'mock:v1', now);
 
-      // 1. Initial state - should trigger plan
-      expect(shouldTriggerPlan(db, projectId)).toBe(true);
+        // 1. Initial state - should trigger plan
+        expect(shouldTriggerPlan(db, projectId)).toBe(true);
 
-      // 2. Plan creates edges
-      const edgeIds = insertEdges(db, projectId, [
-        { from_node_ids: [1], direction_description: 'scan ports' },
-        { from_node_ids: [1], direction_description: 'enum subdomains' },
-      ], now);
-      setProjectLastPlanAt(db, projectId, now);
+        // 2. Plan creates edges
+        const edgeIds = insertEdges(db, projectId, [
+          { from_node_ids: [1], direction_description: 'scan ports' },
+          { from_node_ids: [1], direction_description: 'enum subdomains' },
+        ], now);
+        setProjectLastPlanAt(db, projectId, now);
 
-      // 3. Plan snapshot includes all edges
-      const planSnapshot = renderSnapshot(db, projectId, {
-        snapshotMaxNodes: 100,
-        snapshotMaxEdges: 200,
-      }, 'plan');
-      expect(planSnapshot.edges).toHaveLength(2);
+        // 3. Plan snapshot includes all edges
+        const planSnapshot = renderSnapshot(db, projectId, {
+          snapshotMaxNodes: 100,
+          snapshotMaxEdges: 200,
+        }, 'plan');
+        expect(planSnapshot.edges).toHaveLength(2);
 
-      // 4. Act selects highest priority edge
-      const claimed = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
-      expect(claimed).not.toBeNull();
-      expect(claimed!.id).toBe(edgeIds[0]);
+        // 4. Act selects highest priority edge
+        const claimed = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
+        expect(claimed).not.toBeNull();
+        expect(claimed!.id).toBe(edgeIds[0]);
 
-      // 5. Act snapshot includes only claimed edge
-      const actSnapshot = renderSnapshot(db, projectId, {
-        snapshotMaxNodes: 100,
-        snapshotMaxEdges: 200,
-      }, 'act', claimed!.id);
-      expect(actSnapshot.edges).toHaveLength(1);
-      expect(actSnapshot.edges[0].id).toBe(claimed!.id);
+        // 5. Act snapshot includes only claimed edge
+        const actSnapshot = renderSnapshot(db, projectId, {
+          snapshotMaxNodes: 100,
+          snapshotMaxEdges: 200,
+        }, 'act', claimed!.id);
+        expect(actSnapshot.edges).toHaveLength(1);
+        expect(actSnapshot.edges[0].id).toBe(claimed!.id);
 
-      // 6. Act completes successfully
-      const resultTime = new Date(Date.now() + 1000).toISOString();
-      writeActResult(db, projectId, claimed!.id, null, 'Found port 80 open', 'agent', resultTime);
+        // 6. Act completes successfully
+        const resultTime = new Date(Date.now() + 1000).toISOString();
+        writeActResult(db, projectId, claimed!.id, null, 'Found port 80 open', 'agent', resultTime);
 
-      // 7. Priority updated after success
-      const edgeAfter = getEdge(db, projectId, claimed!.id);
-      const newPriority = calculateEdgePriority(
-        {
-          priority: edgeAfter!.priority,
-          failureCount: edgeAfter!.failure_count,
-          createdAt: edgeAfter!.created_at,
-        },
-        'success'
-      );
-      updateEdgePriority(db, projectId, claimed!.id, newPriority);
+        // 7. Priority updated after success
+        const edgeAfter = getEdge(db, projectId, claimed!.id);
+        const newPriority = calculateEdgePriority(
+          {
+            priority: edgeAfter!.priority,
+            failureCount: edgeAfter!.failure_count,
+            createdAt: edgeAfter!.created_at,
+          },
+          'success'
+        );
+        updateEdgePriority(db, projectId, claimed!.id, newPriority);
 
-      // 8. Verify edge is completed
-      const completedEdge = getEdge(db, projectId, claimed!.id);
-      expect(completedEdge!.to_node_ids).toHaveLength(1);
+        // 8. Verify edge is completed
+        const completedEdge = getEdge(db, projectId, claimed!.id);
+        expect(completedEdge!.to_node_ids).toHaveLength(1);
 
-      // 9. New node should trigger next plan
-      expect(shouldTriggerPlan(db, projectId)).toBe(true);
+        // 9. New node should trigger next plan (node_created mode)
+        expect(shouldTriggerPlan(db, projectId)).toBe(true);
+      } finally {
+        config.planTriggerMode = originalMode;
+      }
     });
 
     it('should handle edge failure and priority reduction', () => {

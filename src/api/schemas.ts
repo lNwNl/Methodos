@@ -21,4 +21,5 @@ export const settingsSchema = z.object({
   maxActConcurrency: z.number().int().min(1).optional(),
   snapshotMaxNodes: z.number().int().min(10).optional(),
   snapshotMaxEdges: z.number().int().min(10).optional(),
+  planTriggerMode: z.enum(['edge_drain', 'node_created']).optional(),
 });

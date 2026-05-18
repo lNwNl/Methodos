@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { renderSnapshot } from '../snapshot/render';
 import { renderPlanPrompt } from '../prompt/plan';
 import { config } from '../config';
-import { getProject, hasNewNodesSince, insertEdges, setProjectLastPlanAt, updateProject, incrementPlanRound, setPlanTiming } from '../db/operations';
+import { getProject, hasNewNodesSince, hasUnresultedEdges, insertEdges, setProjectLastPlanAt, updateProject, incrementPlanRound, setPlanTiming } from '../db/operations';
 import type { AgentDriver, PlanOutput } from '../driver/types';
 import { z } from 'zod';
 
@@ -37,6 +37,9 @@ export function shouldTriggerPlan(
     }
   }
 
+  if (config.planTriggerMode === 'edge_drain') {
+    return !hasUnresultedEdges(db, projectId);
+  }
   return hasNewNodesSince(db, projectId, project.last_plan_at);
 }
 

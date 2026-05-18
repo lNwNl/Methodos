@@ -14,11 +14,31 @@ const REPORT_SETTINGS_KEYS = [
   'report.temperature',
 ];
 
+const AGENT_SETTINGS_KEYS = [
+  'agentProvider',
+  'agentApiKey',
+  'agentBaseURL',
+  'agentModel',
+];
+
 function maskSettings(settings: Record<string, string>): Record<string, string> {
   const result: Record<string, string> = {};
   for (const k of REPORT_SETTINGS_KEYS) {
     const val = settings[k] ?? '';
     if (k.endsWith('_key') && val.length > 8) {
+      result[k] = val.slice(0, 4) + '••••••••' + val.slice(-4);
+    } else {
+      result[k] = val;
+    }
+  }
+  return result;
+}
+
+function maskAgentSettings(settings: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const k of AGENT_SETTINGS_KEYS) {
+    const val = settings[k] ?? '';
+    if (k === 'agentApiKey' && val.length > 8) {
       result[k] = val.slice(0, 4) + '••••••••' + val.slice(-4);
     } else {
       result[k] = val;
@@ -59,7 +79,7 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
     const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as any;
 
     const { ensureContainer } = await import('../docker/manager');
-    ensureContainer(projectId, image_tag).catch((err: any) => {
+    ensureContainer(projectId, image_tag, db).catch((err: any) => {
       console.error(`Failed to start container for project ${projectId}:`, err.message);
     });
 
@@ -274,6 +294,37 @@ export function registerRoutes(app: FastifyInstance, db: Database.Database, useD
     updateSettings(db, filtered, ts);
 
     return maskSettings(getSettings(db));
+  });
+
+  // GET /settings/agent - 获取 Agent 配置（敏感字段脱敏）
+  app.get('/settings/agent', async (_request, _reply) => {
+    const { getSettings } = await import('../db/operations');
+    return maskAgentSettings(getSettings(db));
+  });
+
+  // PUT /settings/agent - 更新 Agent 配置
+  app.put('/settings/agent', async (request, reply) => {
+    const { getSettings, updateSettings } = await import('../db/operations');
+    const { loadConfigFromDb } = await import('../config');
+
+    const body = request.body as Record<string, string>;
+
+    const filtered: Record<string, string> = {};
+    for (const k of AGENT_SETTINGS_KEYS) {
+      if (k in body && typeof body[k] === 'string' && !body[k].includes('•')) {
+        filtered[k] = body[k];
+      }
+    }
+
+    if (Object.keys(filtered).length === 0) {
+      return reply.status(400).send({ error: 'No valid settings to update' });
+    }
+
+    const ts = new Date().toISOString();
+    updateSettings(db, filtered, ts);
+    loadConfigFromDb(db);
+
+    return maskAgentSettings(getSettings(db));
   });
 
   // GET /reports/:id/download - 下载报告文件

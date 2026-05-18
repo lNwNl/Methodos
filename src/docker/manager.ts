@@ -3,6 +3,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
+import Database from 'better-sqlite3';
+import { getSettings } from '../db/operations';
 
 const home = homedir();
 
@@ -27,6 +29,7 @@ function podman(args: string[], timeout = 30000): Promise<{ stdout: string; stde
 export async function ensureContainer(
   projectId: number,
   imageTag: string,
+  db?: Database.Database,
 ): Promise<void> {
   const name = getContainerName(projectId);
 
@@ -63,14 +66,16 @@ export async function ensureContainer(
     throw err;
   }
 
-  await injectOpencodeConfig(name);
+  await injectOpencodeConfig(name, db);
 }
 
-async function injectOpencodeConfig(containerName: string): Promise<void> {
+async function injectOpencodeConfig(containerName: string, db?: Database.Database): Promise<void> {
   const hostConfigPath = join(home, '.config/opencode/opencode.json');
-  if (!existsSync(hostConfigPath)) return;
+  if (!existsSync(hostConfigPath) && !db) return;
 
-  const hostConfig = JSON.parse(readFileSync(hostConfigPath, 'utf-8'));
+  const hostConfig = existsSync(hostConfigPath)
+    ? JSON.parse(readFileSync(hostConfigPath, 'utf-8'))
+    : {};
   const merged: any = { mcp: {}, plugin: [] };
 
   // Copy context7 and exa from host config (includes API keys in headers)
@@ -82,6 +87,24 @@ async function injectOpencodeConfig(containerName: string): Promise<void> {
 
   // Add terminal MCP (no host plugins needed)
   merged.mcp.terminal = { type: 'local', command: ['uvx', 'terminal-mcp'] };
+
+  // Inject agent config from DB settings
+  if (db) {
+    const settings = getSettings(db);
+    const provider = settings.agentProvider;
+    const apiKey = settings.agentApiKey;
+    const baseURL = settings.agentBaseURL;
+    const model = settings.agentModel;
+
+    if (provider && apiKey) {
+      const providerOpts: any = { apiKey };
+      if (baseURL) providerOpts.baseURL = baseURL;
+      merged.provider = { [provider]: { options: providerOpts } };
+    }
+    if (model) {
+      merged.model = model;
+    }
+  }
 
   return new Promise<void>((resolve, reject) => {
     const child = execFile(PODMAN, [

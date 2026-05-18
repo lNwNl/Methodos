@@ -11,34 +11,6 @@ createApp({
     const agents = ref([{ value: 'mock', label: 'Mock（测试）' }]);
     let timer = null;
 
-    const showSettings = ref(false);
-    const settingsTab = ref('general');
-    const settingsLoading = ref(false);
-    const settingsSaving = ref(false);
-    const settings = reactive({
-      actTimeoutMs: 10,
-      concludeTimeoutMs: 5,
-      planTimeoutMs: 10,
-      claimedExpiryMs: 30,
-      tickIntervalMs: 1,
-      maxFailures: 3,
-      maxActConcurrency: 3,
-      snapshotMaxNodes: 100,
-      snapshotMaxEdges: 200,
-    });
-
-    const reportSettings = reactive({
-      llm_provider: 'openai',
-      openai_api_key: '',
-      openai_base_url: 'https://api.openai.com/v1',
-      anthropic_api_key: '',
-      ollama_base_url: 'http://localhost:11434',
-      model_name: 'gpt-4o',
-      temperature: '0.7',
-    });
-    const reportSettingsLoading = ref(false);
-    const reportSettingsSaving = ref(false);
-
     function currentTheme() {
       return document.documentElement.getAttribute('data-theme') || 'light';
     }
@@ -120,115 +92,6 @@ createApp({
       }
     }
 
-    async function fetchSettings() {
-      settingsLoading.value = true;
-      try {
-        const r = await fetch('/settings');
-        const data = await r.json();
-        settings.actTimeoutMs = Math.round((parseInt(data.actTimeoutMs) || 600000) / 60000);
-        settings.concludeTimeoutMs = Math.round((parseInt(data.concludeTimeoutMs) || 300000) / 60000);
-        settings.planTimeoutMs = Math.round((parseInt(data.planTimeoutMs) || 600000) / 60000);
-        settings.claimedExpiryMs = Math.round((parseInt(data.claimedExpiryMs) || 1800000) / 60000);
-        settings.tickIntervalMs = Math.round((parseInt(data.tickIntervalMs) || 1000) / 1000);
-        settings.maxFailures = parseInt(data.maxFailures) || 3;
-        settings.maxActConcurrency = parseInt(data.maxActConcurrency) || 3;
-        settings.snapshotMaxNodes = parseInt(data.snapshotMaxNodes) || 100;
-        settings.snapshotMaxEdges = parseInt(data.snapshotMaxEdges) || 200;
-      } catch (e) {
-        alert(`加载设置失败: ${e.message}`);
-      } finally {
-        settingsLoading.value = false;
-      }
-    }
-
-    async function saveSettings() {
-      settingsSaving.value = true;
-      try {
-        const body = {
-          actTimeoutMs: settings.actTimeoutMs * 60000,
-          concludeTimeoutMs: settings.concludeTimeoutMs * 60000,
-          planTimeoutMs: settings.planTimeoutMs * 60000,
-          claimedExpiryMs: settings.claimedExpiryMs * 60000,
-          tickIntervalMs: settings.tickIntervalMs * 1000,
-          maxFailures: settings.maxFailures,
-          maxActConcurrency: settings.maxActConcurrency,
-          snapshotMaxNodes: settings.snapshotMaxNodes,
-          snapshotMaxEdges: settings.snapshotMaxEdges,
-        };
-        const r = await fetch('/settings', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        if (!r.ok) {
-          const b = await r.json();
-          throw new Error(b.error || String(r.status));
-        }
-        showSettings.value = false;
-      } catch (e) {
-        alert(`保存设置失败: ${e.message}`);
-      } finally {
-        settingsSaving.value = false;
-      }
-    }
-
-    function openSettings() {
-      showSettings.value = true;
-      settingsTab.value = 'general';
-      fetchSettings();
-      fetchReportSettings();
-    }
-
-    async function fetchReportSettings() {
-      reportSettingsLoading.value = true;
-      try {
-        const r = await fetch('/settings/report');
-        const data = await r.json();
-        reportSettings.llm_provider = data['report.llm_provider'] || 'openai';
-        reportSettings.openai_api_key = data['report.openai_api_key'] || '';
-        reportSettings.openai_base_url = data['report.openai_base_url'] || 'https://api.openai.com/v1';
-        reportSettings.anthropic_api_key = data['report.anthropic_api_key'] || '';
-        reportSettings.ollama_base_url = data['report.ollama_base_url'] || 'http://localhost:11434';
-        reportSettings.model_name = data['report.model_name'] || 'gpt-4o';
-        reportSettings.temperature = data['report.temperature'] || '0.7';
-      } catch (e) {
-        console.error('Failed to load report settings:', e);
-      } finally {
-        reportSettingsLoading.value = false;
-      }
-    }
-
-    async function saveReportSettings() {
-      reportSettingsSaving.value = true;
-      try {
-        const body = {
-          'report.llm_provider': reportSettings.llm_provider,
-          'report.openai_api_key': reportSettings.openai_api_key,
-          'report.openai_base_url': reportSettings.openai_base_url,
-          'report.anthropic_api_key': reportSettings.anthropic_api_key,
-          'report.ollama_base_url': reportSettings.ollama_base_url,
-          'report.model_name': reportSettings.model_name,
-          'report.temperature': reportSettings.temperature,
-        };
-        const r = await fetch('/settings/report', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        if (!r.ok) {
-          const b = await r.json();
-          throw new Error(b.error || String(r.status));
-        }
-        // 重新获取脱敏后的值
-        await fetchReportSettings();
-        showSettings.value = false;
-      } catch (e) {
-        alert(`保存报告配置失败: ${e.message}`);
-      } finally {
-        reportSettingsSaving.value = false;
-      }
-    }
-
     function statusInfo(p) {
       if (p.status === 'active' && !p.last_plan_at && p.edge_total === 0) {
         return { cls: 'badge-planning', label: '推理中' };
@@ -263,8 +126,6 @@ createApp({
     return {
       projects, loading, error, showModal, form, submitting, agents,
       createProject, stopProject, pushProject, statusInfo, toggleTheme, formatDuration,
-      showSettings, settingsTab, settingsLoading, settingsSaving, settings, openSettings, saveSettings,
-      reportSettings, reportSettingsLoading, reportSettingsSaving, fetchReportSettings, saveReportSettings,
     };
   },
 
@@ -277,7 +138,7 @@ createApp({
       </div>
       <div class="app-header-right">
         <button class="theme-toggle" @click="toggleTheme" title="切换主题">◐</button>
-        <button class="btn" @click="openSettings" title="设置">⚙</button>
+        <a href="/settings.html" class="btn" title="设置">⚙</a>
         <button class="btn btn-primary" @click="showModal = true">+ 新建项目</button>
       </div>
     </div>
@@ -302,118 +163,6 @@ createApp({
             <button type="submit" class="btn btn-primary" :disabled="submitting">{{ submitting ? '创建中...' : '创建' }}</button>
           </div>
         </form>
-      </div>
-    </div>
-    </Transition>
-
-    <Transition name="fade">
-    <div v-if="showSettings" class="modal-backdrop" @click.self="showSettings = false">
-      <div class="modal-panel" style="max-width:520px">
-        <h2 class="modal-title">设置</h2>
-        <div class="settings-tabs">
-          <button class="settings-tab" :class="{ active: settingsTab === 'general' }" @click="settingsTab = 'general'">通用</button>
-          <button class="settings-tab" :class="{ active: settingsTab === 'report' }" @click="settingsTab = 'report'">报告</button>
-        </div>
-
-        <!-- 通用设置 -->
-        <div v-if="settingsTab === 'general'">
-          <div v-if="settingsLoading" class="empty-state"><span class="spinner"></span></div>
-          <form v-else @submit.prevent="saveSettings">
-            <div class="form-group">
-              <label class="form-label">Act 超时（分钟）</label>
-              <input type="number" v-model.number="settings.actTimeoutMs" class="input" min="1" step="1">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Conclude 超时（分钟）</label>
-              <input type="number" v-model.number="settings.concludeTimeoutMs" class="input" min="1" step="1">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Plan 超时（分钟）</label>
-              <input type="number" v-model.number="settings.planTimeoutMs" class="input" min="1" step="1">
-            </div>
-            <div class="form-group">
-              <label class="form-label">边认领过期（分钟）</label>
-              <input type="number" v-model.number="settings.claimedExpiryMs" class="input" min="1" step="1">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Tick 间隔（秒）</label>
-              <input type="number" v-model.number="settings.tickIntervalMs" class="input" min="0.1" step="0.1">
-            </div>
-            <div class="form-group">
-              <label class="form-label">最大失败次数</label>
-              <input type="number" v-model.number="settings.maxFailures" class="input" min="1" step="1">
-            </div>
-            <div class="form-group">
-              <label class="form-label">最大并行 Act 数</label>
-              <input type="number" v-model.number="settings.maxActConcurrency" class="input" min="1" step="1">
-            </div>
-            <div class="form-group">
-              <label class="form-label">快照最大节点数</label>
-              <input type="number" v-model.number="settings.snapshotMaxNodes" class="input" min="10" step="1">
-            </div>
-            <div class="form-group">
-              <label class="form-label">快照最大边数</label>
-              <input type="number" v-model.number="settings.snapshotMaxEdges" class="input" min="10" step="1">
-            </div>
-            <div class="form-actions">
-              <button type="button" class="btn" @click="showSettings = false">取消</button>
-              <button type="submit" class="btn btn-primary" :disabled="settingsSaving">{{ settingsSaving ? '保存中...' : '保存' }}</button>
-            </div>
-          </form>
-        </div>
-
-        <!-- 报告设置 -->
-        <div v-if="settingsTab === 'report'">
-          <div v-if="reportSettingsLoading" class="empty-state"><span class="spinner"></span></div>
-          <form v-else @submit.prevent="saveReportSettings">
-            <div class="form-group">
-              <label class="form-label">LLM 提供商</label>
-              <select v-model="reportSettings.llm_provider" class="select">
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="ollama">Ollama（本地）</option>
-              </select>
-            </div>
-
-            <template v-if="reportSettings.llm_provider === 'openai'">
-              <div class="form-group">
-                <label class="form-label">API Key</label>
-                <input type="password" v-model="reportSettings.openai_api_key" class="input" placeholder="sk-..." autocomplete="off">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Base URL</label>
-                <input type="text" v-model="reportSettings.openai_base_url" class="input" placeholder="https://api.openai.com/v1">
-              </div>
-            </template>
-
-            <template v-if="reportSettings.llm_provider === 'anthropic'">
-              <div class="form-group">
-                <label class="form-label">API Key</label>
-                <input type="password" v-model="reportSettings.anthropic_api_key" class="input" placeholder="sk-ant-..." autocomplete="off">
-              </div>
-            </template>
-
-            <template v-if="reportSettings.llm_provider === 'ollama'">
-              <div class="form-group">
-                <label class="form-label">Ollama URL</label>
-                <input type="text" v-model="reportSettings.ollama_base_url" class="input" placeholder="http://localhost:11434">
-              </div>
-            </template>
-
-            <div class="form-group">
-              <label class="form-label">模型名称</label>
-              <input type="text" v-model="reportSettings.model_name" class="input" placeholder="gpt-4o">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Temperature</label>
-              <input type="number" v-model="reportSettings.temperature" class="input" min="0" max="2" step="0.1">
-            </div>
-            <div class="form-actions">
-              <button type="button" class="btn" @click="showSettings = false">取消</button>
-              <button type="submit" class="btn btn-primary" :disabled="reportSettingsSaving">{{ reportSettingsSaving ? '保存中...' : '保存' }}</button>
-            </div>
-          </form>
-        </div>
       </div>
     </div>
     </Transition>

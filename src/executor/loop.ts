@@ -41,7 +41,7 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
     const existing = state.containerPromises.get(pid);
     if (existing) return existing;
 
-    const promise = ensureContainer(pid, imageTag).finally(() => {
+    const promise = ensureContainer(pid, imageTag, db).finally(() => {
       state.containerPromises.delete(pid);
     });
     state.containerPromises.set(pid, promise);

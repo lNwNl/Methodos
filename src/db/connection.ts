@@ -130,6 +130,11 @@ export function initDb() {
       priorityBoostSuccess: '1.2',
       priorityPenaltyFailure: '0.9',
       priorityDecayRateHourly: '0.01',
+      planTriggerMode: 'edge_drain',
+      agentProvider: '',
+      agentApiKey: '',
+      agentBaseURL: '',
+      agentModel: '',
     };
     const insert = db.prepare('INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)');
     const txn = db.transaction(() => {

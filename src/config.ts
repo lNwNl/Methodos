@@ -28,9 +28,11 @@ const ENV_OVERRIDES: Record<string, string> = {
   snapshotMaxEdges: 'SNAPSHOT_MAX_EDGES',
   maxValidationRetries: 'MAX_VALIDATION_RETRIES',
   schedulingAlgorithm: 'SCHEDULING_ALGORITHM',
+  planTriggerMode: 'PLAN_TRIGGER_MODE',
 };
 
 type SchedulingAlgorithm = 'random' | 'priority';
+type PlanTriggerMode = 'edge_drain' | 'node_created';
 
 interface Config {
   databasePath: string;
@@ -51,6 +53,11 @@ interface Config {
   priorityPenaltyFailure: number;
   priorityDecayRateHourly: number;
   schedulingAlgorithm: SchedulingAlgorithm;
+  planTriggerMode: PlanTriggerMode;
+  agentProvider: string;
+  agentApiKey: string;
+  agentBaseURL: string;
+  agentModel: string;
 }
 
 const _config: Config = {
@@ -76,6 +83,11 @@ const _config: Config = {
   priorityPenaltyFailure: DEFAULTS.priorityPenaltyFailure,
   priorityDecayRateHourly: DEFAULTS.priorityDecayRateHourly,
   schedulingAlgorithm: 'random',
+  planTriggerMode: 'edge_drain',
+  agentProvider: '',
+  agentApiKey: '',
+  agentBaseURL: '',
+  agentModel: '',
 };
 
 export const config: Config = _config;
@@ -109,4 +121,16 @@ export function loadConfigFromDb(db: Database.Database): void {
       _config.schedulingAlgorithm = val;
     }
   }
+
+  const ptmEnv = process.env.PLAN_TRIGGER_MODE;
+  if (ptmEnv === 'edge_drain' || ptmEnv === 'node_created') {
+    _config.planTriggerMode = ptmEnv;
+  } else if (settings.planTriggerMode === 'edge_drain' || settings.planTriggerMode === 'node_created') {
+    _config.planTriggerMode = settings.planTriggerMode;
+  }
+
+  _config.agentProvider = settings.agentProvider || '';
+  _config.agentApiKey = settings.agentApiKey || '';
+  _config.agentBaseURL = settings.agentBaseURL || '';
+  _config.agentModel = settings.agentModel || '';
 }
