@@ -1,8 +1,6 @@
 const params = new URLSearchParams(window.location.search);
 const projectId = params.get('id');
 
-const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
-
     const { createApp, ref, onMounted, onBeforeUnmount, nextTick } = Vue;
 
     createApp({
@@ -122,8 +120,6 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
     let resizing = false;
     let resizeStartX = 0;
     let resizeStartW = 0;
-    const draggedPositions = new Map();
-
     const TRANSIENT_CLASSES = new Set(['dimmed', 'focus', 'evidence']);
 
     const LAYOUT_NAMES = {
@@ -161,14 +157,10 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
       layoutKey.value = key;
       localStorage.setItem('methodos-layout', key);
       cy.layout(layoutOpts(key)).run();
-      setTimeout(() => { restoreDragged(); cy.fit(undefined, 50); }, 50);
+      setTimeout(() => cy.fit(undefined, 50), 50);
     }
 
-    function runLayout() {
-      if (!cy) return;
-      cy.layout(layoutOpts(layoutKey.value)).run();
-      setTimeout(() => restoreDragged(), 50);
-    }
+
 
     function statusInfo(p) {
       if (p.status === 'active' && !p.last_plan_at && p.edges.length === 0) {
@@ -423,20 +415,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
       applyEvidence(p);
 
       if (newIds.size > 0) {
-        const existingPositions = new Map();
-        cy.nodes().forEach(n => {
-          if (!newIds.has(n.id()) && !draggedPositions.has(n.id())) {
-            existingPositions.set(n.id(), { x: n.position().x, y: n.position().y });
-          }
-        });
-
         cy.layout(layoutOpts(layoutKey.value)).run();
-        restoreDragged();
-
-        for (const [id, pos] of existingPositions) {
-          const node = cy.getElementById(id);
-          if (node.length) node.position(pos);
-        }
 
         const fresh = cy.elements().filter(el => newIds.has(el.id()));
         if (fresh.length) {
@@ -500,12 +479,6 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
           clearHighlight();
         }
       });
-
-      cy.on('free', 'node', e => {
-        const node = e.target;
-        const pos = node.position();
-        draggedPositions.set(node.id(), { x: pos.x, y: pos.y });
-      });
     }
 
     // ---- Highlight helpers ----
@@ -530,12 +503,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
       cy.elements().removeClass('dimmed').removeClass('focus');
     }
 
-    function restoreDragged() {
-      for (const [id, pos] of draggedPositions) {
-        const node = cy.getElementById(id);
-        if (node.length) node.position(pos);
-      }
-    }
+
 
     // ---- Panel resize ----
 
@@ -899,7 +867,7 @@ const NODE_COLORS = { human: '#4F46E5', agent: '#0D9488', system: '#78716C' };
       project, loading, error, selected, showPushModal, pushNodes, panelWidth, layoutKey, panelTab, LAYOUT_NAMES, graphReady,
       latestReport, reportGenerating,
       edgeTimings, edgeTimingsDone, timeline, timelineMax,
-      stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, formatTime, formatDuration, evidenceNodesDesc, buildLog, selectLogEntry, computeEdgeTimings,
+      stopProject, confirmPush, addNode, statusInfo, zoomIn, zoomOut, zoomFit, trunc, formatTime, formatDuration, evidenceNodesDesc, buildLog, selectLogEntry,
       startPanelResize, setLayout, toggleTheme, generateReport,
     };
   },

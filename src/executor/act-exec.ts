@@ -95,7 +95,8 @@ export async function executeAct(
   }
 
   try {
-    writeActResult(db, projectId, edge.id, parsed.data.title || null, parsed.data.description, 'agent', ts);
+    const resultTs = new Date().toISOString();
+    writeActResult(db, projectId, edge.id, parsed.data.title || null, parsed.data.description, 'agent', resultTs);
     recalcEdgePriority(db, projectId, edge, 'success');
     return { success: true, edgeId: edge.id };
   } catch (err: any) {
