@@ -44,6 +44,7 @@ export async function ensureContainer(
     bindArgs.push('-v', bind);
   }
 
+  try {
     await podman([
       'run', '-d', '--name', name,
       '--privileged',
@@ -54,6 +55,13 @@ export async function ensureContainer(
       '-w', '/root/workspace',
       imageTag, 'sleep', 'infinity',
     ], 120000);
+  } catch (err: any) {
+    if (err.message?.includes('already in use')) {
+      await podman(['inspect', name]);
+      return;
+    }
+    throw err;
+  }
 
   await injectOpencodeConfig(name);
 }

@@ -13,6 +13,7 @@ interface LoopState {
   running: boolean;
   planInFlight: Set<number>;
   actsInFlight: Map<number, number>;
+  containerPromises: Map<number, Promise<void>>;
   drivers: Map<number, AgentDriver>;
   lastPlanExecutedAt: Map<number, string>;
 }
@@ -24,6 +25,7 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
     running: false,
     planInFlight: new Set(),
     actsInFlight: new Map(),
+    containerPromises: new Map(),
     drivers: new Map(),
     lastPlanExecutedAt: new Map(),
   };
@@ -33,6 +35,17 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
       state.drivers.set(pid, driverFactory(pid, agentType));
     }
     return state.drivers.get(pid)!;
+  }
+
+  async function ensureContainerSafe(pid: number, imageTag: string): Promise<void> {
+    const existing = state.containerPromises.get(pid);
+    if (existing) return existing;
+
+    const promise = ensureContainer(pid, imageTag).finally(() => {
+      state.containerPromises.delete(pid);
+    });
+    state.containerPromises.set(pid, promise);
+    return promise;
   }
 
   async function tick() {
@@ -46,7 +59,7 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
 
       if (project.agent_type === 'opencode') {
         try {
-          await ensureContainer(pid, project.image_tag);
+          await ensureContainerSafe(pid, project.image_tag);
         } catch (err: any) {
           logger.warn({ projectId: pid, error: err.message }, 'Container not ready, skipping tick');
           continue;
