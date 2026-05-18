@@ -24,6 +24,27 @@ export function closeDb() {
   }
 }
 
+function fixLegacyPrioritySettings(db: Database.Database): void {
+  const legacyFixes: Record<string, { threshold: number; correct: string }> = {
+    priorityBoostSuccess: { threshold: 10, correct: '1.2' },
+    priorityPenaltyFailure: { threshold: 10, correct: '0.9' },
+    priorityDecayRateHourly: { threshold: 0.5, correct: '0.01' },
+  };
+  const now = new Date().toISOString();
+  const upsert = db.prepare(
+    'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at'
+  );
+  const txn = db.transaction(() => {
+    for (const [key, { threshold, correct }] of Object.entries(legacyFixes)) {
+      const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+      if (row && Number(row.value) > threshold) {
+        upsert.run(key, correct, now);
+      }
+    }
+  });
+  txn();
+}
+
 export function initDb() {
   const db = getRawDb();
 
@@ -39,6 +60,8 @@ export function initDb() {
       failure_count INTEGER NOT NULL DEFAULT 0,
       summary TEXT,
       evidence_node_ids TEXT,
+      plan_started_at TEXT,
+      plan_completed_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -104,9 +127,9 @@ export function initDb() {
       snapshotMaxNodes: '100',
       snapshotMaxEdges: '200',
       planMinIntervalMs: '5000',
-      priorityBoostSuccess: '120',
-      priorityPenaltyFailure: '90',
-      priorityDecayRateHourly: '1',
+      priorityBoostSuccess: '1.2',
+      priorityPenaltyFailure: '0.9',
+      priorityDecayRateHourly: '0.01',
     };
     const insert = db.prepare('INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)');
     const txn = db.transaction(() => {
@@ -116,6 +139,9 @@ export function initDb() {
     });
     txn();
   }
+
+  // Migration: fix priority settings that were stored 100x too large
+  fixLegacyPrioritySettings(db);
 
   return db;
 }

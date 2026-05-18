@@ -95,26 +95,20 @@ export function createLoop(db: Database.Database, driverFactory: DriverFactory) 
         state.actsInFlight.set(pid, inflight + 1);
 
         executeAct(db, pid, getDriver(pid, project.agent_type), ts).then((result) => {
-          const current = state.actsInFlight.get(pid) || 1;
-          if (current <= 1) {
-            state.actsInFlight.delete(pid);
-          } else {
-            state.actsInFlight.set(pid, current - 1);
-          }
-
           if (result.success) {
             logger.info({ projectId: pid, edgeId: result.edgeId }, 'Act completed');
           } else if (result.error !== 'No unclaimed edge') {
             logger.warn({ projectId: pid, edgeId: result.edgeId, error: result.error }, 'Act failed');
           }
         }).catch((err) => {
+          logger.error({ projectId: pid, err }, 'Act execution threw');
+        }).finally(() => {
           const current = state.actsInFlight.get(pid) || 1;
           if (current <= 1) {
             state.actsInFlight.delete(pid);
           } else {
             state.actsInFlight.set(pid, current - 1);
           }
-          logger.error({ projectId: pid, err }, 'Act execution threw');
         });
       }
     }

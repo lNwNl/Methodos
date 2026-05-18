@@ -95,10 +95,7 @@ function writePlan(
     return handlePlanFailure(db, projectId, ts, 'complete=true but missing summary or evidence_node_ids');
   }
   if (!plan.complete && plan.edges.length === 0) {
-    const failTxn = db.transaction(() => {
-      updateProject(db, projectId, { status: 'failed' }, ts);
-    });
-    failTxn();
+    updateProject(db, projectId, { status: 'failed' }, ts);
     return { success: true, error: 'Plan 判定无法继续——探索方向耗尽，项目标记为 failed' };
   }
 

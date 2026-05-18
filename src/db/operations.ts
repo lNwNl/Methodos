@@ -1,5 +1,13 @@
 import Database from 'better-sqlite3';
 
+function parseEdgeRow(row: any) {
+  return {
+    ...row,
+    from_node_ids: JSON.parse(row.from_node_ids),
+    to_node_ids: JSON.parse(row.to_node_ids),
+  };
+}
+
 export function createProject(
   db: Database.Database,
   title: string,
@@ -104,18 +112,7 @@ export function claimEdge(
 
   if (!row) return null;
 
-  return {
-    id: row.id,
-    project_id: row.project_id,
-    from_node_ids: JSON.parse(row.from_node_ids),
-    to_node_ids: JSON.parse(row.to_node_ids),
-    claimed_at: row.claimed_at,
-    title: row.title,
-    direction_description: row.direction_description,
-    failure_count: row.failure_count,
-    priority: row.priority,
-    created_at: row.created_at,
-  };
+  return parseEdgeRow(row);
 }
 
 export function updateEdgePriority(
@@ -140,18 +137,7 @@ export function getEdge(
 
   if (!row) return null;
 
-  return {
-    id: row.id,
-    project_id: row.project_id,
-    from_node_ids: JSON.parse(row.from_node_ids),
-    to_node_ids: JSON.parse(row.to_node_ids),
-    claimed_at: row.claimed_at,
-    title: row.title,
-    direction_description: row.direction_description,
-    failure_count: row.failure_count,
-    priority: row.priority,
-    created_at: row.created_at,
-  };
+  return parseEdgeRow(row);
 }
 
 export function writeActResult(
@@ -251,11 +237,7 @@ export function getSnapshotData(db: Database.Database, projectId: number) {
 
   return {
     nodes,
-    edges: edges.map((e: any) => ({
-      ...e,
-      from_node_ids: JSON.parse(e.from_node_ids),
-      to_node_ids: JSON.parse(e.to_node_ids),
-    })),
+    edges: edges.map(parseEdgeRow),
   };
 }
 
@@ -372,11 +354,7 @@ export function getProjectDetail(db: Database.Database, projectId: number) {
     ...project,
     evidence_node_ids: project.evidence_node_ids ? JSON.parse(project.evidence_node_ids) : null,
     nodes,
-    edges: edges.map((e: any) => ({
-      ...e,
-      from_node_ids: JSON.parse(e.from_node_ids),
-      to_node_ids: JSON.parse(e.to_node_ids),
-    })),
+    edges: edges.map(parseEdgeRow),
   };
 }
 
@@ -386,21 +364,16 @@ export function getEdgeStatuses(db: Database.Database, projectId: number) {
   ).all(projectId) as any[];
 
   return edges.map((e: any) => {
-    const toIds = JSON.parse(e.to_node_ids);
+    const parsed = parseEdgeRow(e);
     let status: string;
-    if (toIds.length > 0) {
+    if (parsed.to_node_ids.length > 0) {
       status = 'completed';
     } else if (e.claimed_at !== null) {
       status = 'running';
     } else {
       status = 'pending';
     }
-    return {
-      ...e,
-      from_node_ids: JSON.parse(e.from_node_ids),
-      to_node_ids: toIds,
-      status,
-    };
+    return { ...parsed, status };
   });
 }
 
