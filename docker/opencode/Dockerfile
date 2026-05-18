@@ -1,8 +1,8 @@
 FROM --platform=amd64 kalilinux/kali-rolling:latest
 
 # Single layer: apt packages + Node.js + opencode + sudo config
-RUN apt update && \
-    apt install -y --no-install-recommends \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
         kali-tools-exploitation \
         kali-tools-post-exploitation \
         kali-tools-web \
@@ -27,12 +27,12 @@ RUN apt update && \
     curl -fsSL https://deb.nodesource.com/setup_24.x -o /tmp/nodesource_setup.sh && \
     bash /tmp/nodesource_setup.sh && \
     rm /tmp/nodesource_setup.sh && \
-    apt install -y nodejs && \
+    apt-get install -y nodejs && \
     npm install -g opencode-ai@1.15.3 && \
     npm cache clean --force && \
     echo 'root ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/nopasswd && \
     chmod 440 /etc/sudoers.d/nopasswd && \
-    apt clean && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Scripts + configs + skills (ordered by change frequency, least-frequent first)
