@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type Database from 'better-sqlite3';
 import {
   createProject,
@@ -18,6 +18,7 @@ import {
   getEdge,
 } from './operations';
 import { createTestDb } from './test-utils';
+import { config } from '../config';
 
 describe('operations', () => {
   let db: Database.Database;
@@ -53,12 +54,13 @@ describe('operations', () => {
 
     const claimed = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
     expect(claimed).not.toBeNull();
-    expect(claimed!.id).toBe(1);
+    expect([1, 2]).toContain(claimed!.id);
     expect(claimed!.claimed_at).not.toBeNull();
 
     const claimed2 = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
     expect(claimed2).not.toBeNull();
-    expect(claimed2!.id).toBe(2);
+    expect([1, 2]).toContain(claimed2!.id);
+    expect(claimed2!.id).not.toBe(claimed!.id);
 
     const claimed3 = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
     expect(claimed3).toBeNull();
@@ -153,6 +155,9 @@ describe('operations', () => {
   });
 
   it('claimEdge orders by priority DESC then created_at ASC', () => {
+    const originalAlgorithm = config.schedulingAlgorithm;
+    config.schedulingAlgorithm = 'priority';
+    
     const now = new Date().toISOString();
     const projectId = createProject(db, 'test', 'mock', 'mock:v1', now);
 
@@ -178,6 +183,8 @@ describe('operations', () => {
     const claimed3 = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
     expect(claimed3).not.toBeNull();
     expect(claimed3!.id).toBe(ids[0]);
+    
+    config.schedulingAlgorithm = originalAlgorithm;
   });
 
   it('updateEdgePriority updates priority value', () => {
@@ -225,5 +232,85 @@ describe('operations', () => {
     expect(edge!.failure_count).toBe(0);
     expect(edge!.priority).toBe(1.0);
     expect(edge!.created_at).toBe(now);
+  });
+
+  describe('random scheduling', () => {
+    let originalAlgorithm: string;
+
+    beforeEach(() => {
+      originalAlgorithm = config.schedulingAlgorithm;
+      config.schedulingAlgorithm = 'random';
+    });
+
+    afterEach(() => {
+      config.schedulingAlgorithm = originalAlgorithm as 'random' | 'priority';
+    });
+
+    it('claims edges randomly regardless of priority', () => {
+      const now = new Date().toISOString();
+      const projectId = createProject(db, 'test', 'mock', 'mock:v1', now);
+
+      const ids = insertEdges(db, projectId, [
+        { from_node_ids: [1], direction_description: 'low priority' },
+        { from_node_ids: [1], direction_description: 'high priority' },
+        { from_node_ids: [1], direction_description: 'medium priority' },
+      ], now);
+
+      updateEdgePriority(db, projectId, ids[0], 0.5);
+      updateEdgePriority(db, projectId, ids[1], 2.0);
+      updateEdgePriority(db, projectId, ids[2], 1.0);
+
+      const claimedIds: number[] = [];
+      for (let i = 0; i < 3; i++) {
+        const claimed = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
+        expect(claimed).not.toBeNull();
+        claimedIds.push(claimed!.id);
+      }
+
+      expect(claimedIds.sort()).toEqual(ids.sort());
+    });
+
+    it('respects claimed expiry in random mode', () => {
+      const now = new Date().toISOString();
+      const projectId = createProject(db, 'test', 'mock', 'mock:v1', now);
+
+      insertEdges(db, projectId, [
+        { from_node_ids: [1], direction_description: 'edge 1' },
+        { from_node_ids: [1], direction_description: 'edge 2' },
+      ], now);
+
+      const claimed1 = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
+      expect(claimed1).not.toBeNull();
+
+      const claimed2 = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
+      expect(claimed2).not.toBeNull();
+
+      const claimed3 = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
+      expect(claimed3).toBeNull();
+    });
+
+    it('can claim edges with high failure count in random mode', () => {
+      const now = new Date().toISOString();
+      const projectId = createProject(db, 'test', 'mock', 'mock:v1', now);
+
+      const ids = insertEdges(db, projectId, [
+        { from_node_ids: [1], direction_description: 'failing edge' },
+      ], now);
+
+      db.prepare('UPDATE edges SET failure_count = 5 WHERE project_id = ? AND id = ?')
+        .run(projectId, ids[0]);
+
+      const claimed = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
+      expect(claimed).not.toBeNull();
+      expect(claimed!.id).toBe(ids[0]);
+    });
+
+    it('returns null when no pending edges exist', () => {
+      const now = new Date().toISOString();
+      const projectId = createProject(db, 'test', 'mock', 'mock:v1', now);
+
+      const claimed = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
+      expect(claimed).toBeNull();
+    });
   });
 });

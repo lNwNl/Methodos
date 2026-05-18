@@ -27,7 +27,10 @@ const ENV_OVERRIDES: Record<string, string> = {
   snapshotMaxNodes: 'SNAPSHOT_MAX_NODES',
   snapshotMaxEdges: 'SNAPSHOT_MAX_EDGES',
   maxValidationRetries: 'MAX_VALIDATION_RETRIES',
+  schedulingAlgorithm: 'SCHEDULING_ALGORITHM',
 };
+
+type SchedulingAlgorithm = 'random' | 'priority';
 
 interface Config {
   databasePath: string;
@@ -47,6 +50,7 @@ interface Config {
   priorityBoostSuccess: number;
   priorityPenaltyFailure: number;
   priorityDecayRateHourly: number;
+  schedulingAlgorithm: SchedulingAlgorithm;
 }
 
 const _config: Config = {
@@ -71,6 +75,7 @@ const _config: Config = {
   priorityBoostSuccess: DEFAULTS.priorityBoostSuccess,
   priorityPenaltyFailure: DEFAULTS.priorityPenaltyFailure,
   priorityDecayRateHourly: DEFAULTS.priorityDecayRateHourly,
+  schedulingAlgorithm: 'random',
 };
 
 export const config: Config = _config;
@@ -90,6 +95,18 @@ export function loadConfigFromDb(db: Database.Database): void {
       (_config as any)[key] = isNaN(parsed) ? defaultVal : parsed;
     } else {
       (_config as any)[key] = defaultVal;
+    }
+  }
+
+  // Handle string config values
+  const stringEnvKey = ENV_OVERRIDES.schedulingAlgorithm;
+  const stringEnvVal = stringEnvKey ? process.env[stringEnvKey] : undefined;
+  if (stringEnvVal === 'random' || stringEnvVal === 'priority') {
+    _config.schedulingAlgorithm = stringEnvVal;
+  } else if (settings.schedulingAlgorithm !== undefined) {
+    const val = settings.schedulingAlgorithm;
+    if (val === 'random' || val === 'priority') {
+      _config.schedulingAlgorithm = val;
     }
   }
 }

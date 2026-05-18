@@ -249,6 +249,9 @@ describe('Multi-level Feedback Queue Integration', () => {
 
   describe('Edge Priority and Selection', () => {
     it('should select highest priority edge for act', () => {
+      const originalAlgorithm = config.schedulingAlgorithm;
+      config.schedulingAlgorithm = 'priority';
+      
       const now = new Date().toISOString();
       const projectId = createProject(db, 'test project', 'mock', 'mock:v1', now);
 
@@ -276,6 +279,8 @@ describe('Multi-level Feedback Queue Integration', () => {
       const claimed3 = claimEdge(db, projectId, 3, 30 * 60 * 1000, now);
       expect(claimed3).not.toBeNull();
       expect(claimed3!.id).toBe(ids[0]); // low priority
+      
+      config.schedulingAlgorithm = originalAlgorithm;
     });
 
     it('should update priority after edge resolution', () => {

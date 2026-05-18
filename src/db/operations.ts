@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { config } from '../config';
 
 function parseEdgeRow(row: any) {
   return {
@@ -98,21 +99,44 @@ export function claimEdge(
   ts: string,
 ) {
   const expiredAt = new Date(Date.now() - expiryMs).toISOString();
-  const row = db.prepare(`
-    UPDATE edges SET claimed_at = ?
-    WHERE project_id = ? AND id = (
-      SELECT id FROM edges
-      WHERE project_id = ? AND to_node_ids = '[]' AND failure_count < ?
+
+  if (config.schedulingAlgorithm === 'random') {
+    // Random: select from all pending, unexpired edges (ignore failure count)
+    const candidates = db.prepare(`
+      SELECT * FROM edges
+      WHERE project_id = ? AND to_node_ids = '[]'
         AND (claimed_at IS NULL OR claimed_at < ?)
-      ORDER BY priority DESC, created_at ASC
-      LIMIT 1
-    )
-    RETURNING *
-  `).get(ts, projectId, projectId, maxFailures, expiredAt) as any;
+    `).all(projectId, expiredAt) as any[];
 
-  if (!row) return null;
+    if (candidates.length === 0) return null;
 
-  return parseEdgeRow(row);
+    const selected = candidates[Math.floor(Math.random() * candidates.length)];
+
+    // Claim the selected edge
+    db.prepare(`
+      UPDATE edges SET claimed_at = ? WHERE project_id = ? AND id = ?
+    `).run(ts, projectId, selected.id);
+
+    // Return with claimed_at set
+    return parseEdgeRow({ ...selected, claimed_at: ts });
+  } else {
+    // Priority: existing behavior
+    const row = db.prepare(`
+      UPDATE edges SET claimed_at = ?
+      WHERE project_id = ? AND id = (
+        SELECT id FROM edges
+        WHERE project_id = ? AND to_node_ids = '[]' AND failure_count < ?
+          AND (claimed_at IS NULL OR claimed_at < ?)
+        ORDER BY priority DESC, created_at ASC
+        LIMIT 1
+      )
+      RETURNING *
+    `).get(ts, projectId, projectId, maxFailures, expiredAt) as any;
+
+    if (!row) return null;
+
+    return parseEdgeRow(row);
+  }
 }
 
 export function updateEdgePriority(
