@@ -11,11 +11,10 @@
 | 技术栈 | Python + FastAPI | TypeScript + Fastify |
 | 进程模型 | 双进程：Server（图谱状态）+ Dispatcher（调度），通过 HTTP 通信 | 单进程：HTTP Server 与 Executor Loop 同进程，直接读写 SQLite |
 | 图谱模型 | 三原语：Fact（不可变）+ Intent（租约认领）+ Hint | 两原语：Node + Edge（可变，优先级动态调整） |
-| 执行循环 | Bootstrap → Reason → Explore，Reason 由图谱变化触发 | Plan-Act-Conclude，Plan 由 edge_drain 或 node_created 触发 |
+| 执行循环 | Bootstrap → Reason → Explore，Reason 由图谱变化触发 | Plan → Act，Plan 由 edge_drain 或 node_created 触发 |
 | Agent 输出 | Adapter 构建 CLI 命令，解析 stdout 提取 JSON | 写入容器内文件，validateAndFix 机制自动重试修正格式 |
-| 并发控制 | 心跳租约 + Worker 优先级/容量/健康窗口过滤 | claimed_at 过期 + 边优先级（成功提升/失败惩罚/时间衰减） |
-| Agent 后端 | Claude Code、Codex、Pi（多 Adapter） | OpenCode Agent（单一 Driver 接口） |
-| 内置 UI | 无 | Vue 3 + Cytoscape.js 图谱可视化 + 报告生成 |
+| 调度策略 | 心跳租约 + Worker 优先级/容量/健康窗口过滤 | 默认随机，可选边优先级（成功提升/失败惩罚/时间衰减）+ claimed_at 过期 |
+| Agent 后端 | Claude Code、Codex、Pi（多 Adapter） | AgentDriver 接口，可扩展 |
 
 ## 架构概览
 
