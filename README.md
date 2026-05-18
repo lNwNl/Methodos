@@ -43,12 +43,12 @@
 │        ↕              │
 │  ┌────────────────────┤
 │  │  Container Pool    │
-│  │  Docker / Podman   │
+│  │  Podman CLI        │
 │  └────────────────────┘
 └────────┬──────────────┘
          │
 ┌────────┴────────────────────────────────────────────────┐
-│               SQLite (better-sqlite3 + Drizzle)          │
+│                  SQLite (better-sqlite3)                  │
 │        projects │ nodes │ edges │ reports │ settings     │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -94,10 +94,10 @@ Plan 和 Act 执行后，Agent 输出的 JSON 会经过校验。若输出文件�
 | 语言       | TypeScript (ES2024, ESM)                       |
 | 运行时     | Node.js 24 + tsx                               |
 | HTTP       | Fastify 5                                      |
-| 数据库     | SQLite + better-sqlite3 + Drizzle ORM          |
-| 容器       | Dockerode + Podman                             |
+| 数据库     | SQLite + better-sqlite3                        |
+| 容器       | Podman CLI（可替换为 Docker）                   |
 | 前端       | Vue 3 (CDN) + Cytoscape.js + Dagre             |
-| 样式       | Tailwind CSS 4                                 |
+| 样式       | CSS Variables（自定义暗色/亮色主题）             |
 | 校验       | Zod 4                                          |
 | 日志       | Pino                                           |
 | 报告       | Python (uv) + LLM 驱动报告生成                  |
@@ -113,13 +113,12 @@ src/
 │   ├── schemas.ts         # Zod 请求/响应 schema
 │   └── routes.test.ts     # API 测试
 ├── db/
-│   ├── schema.ts          # Drizzle ORM schema 定义
-│   ├── connection.ts      # 数据库连接与初始化
+│   ├── connection.ts      # 数据库连接、初始化与 schema 定义
 │   ├── operations.ts      # CRUD 操作（项目、节点、边、设置）
 │   ├── priority.ts        # 边优先级计算算法
 │   └── __tests__/         # 数据库操作测试
 ├── docker/
-│   ├── index.ts           # Dockerode 客户端初始化
+│   ├── index.ts           # Podman 常量与容器命名
 │   ├── manager.ts         # 容器生命周期管理（创建、启停、配置注入）
 │   └── exec.ts            # 容器内命令执行、文件读写
 ├── driver/
@@ -168,6 +167,7 @@ docker/
 
 - Node.js ≥ 24
 - Podman（或 Docker，需修改 `DOCKER_BIN` 环境变量）
+- uv（Python 包管理器，用于报告生成）
 
 ### 安装
 
@@ -181,9 +181,22 @@ npm install
 npm run db:push
 ```
 
-### 启动
+### 拉取 Agent 镜像
 
-默认为 Docker 模式，需要预先构建 Agent 镜像：
+Docker 模式需要预拉取 Agent 容器镜像：
+
+```bash
+# 拉取 OpenCode Agent 镜像
+podman pull ghcr.io/lNwNl/methodos/opencode:latest
+```
+
+如使用 Docker，需设置环境变量：
+
+```bash
+export DOCKER_BIN=docker
+```
+
+### 启动
 
 ```bash
 npm run dev
@@ -232,6 +245,8 @@ npm run typecheck
 | `priorityBoostSuccess` | —                    | 1.2        | 成功后优先级乘数             |
 | `priorityPenaltyFailure` | —                   | 0.9        | 失败后优先级乘数             |
 | `priorityDecayRateHourly` | —                  | 0.01       | 优先级每小时衰减率           |
+| `schedulingAlgorithm`  | `SCHEDULING_ALGORITHM` | random     | 边调度算法（random / priority） |
+| `DATABASE_PATH`        | `DATABASE_PATH`        | `./data/methodos.db` | 数据库文件路径          |
 
 Agent 配置通过 `/settings/agent` API 或数据库 settings 表设置：
 
@@ -241,8 +256,6 @@ Agent 配置通过 `/settings/agent` API 或数据库 settings 表设置：
 | `agentApiKey`    | Agent API Key                |
 | `agentBaseURL`   | Agent 兼容 Base URL          |
 | `agentModel`     | Agent 模型名称               |
-
-数据库路径通过 `DATABASE_PATH` 环境变量配置（默认 `./data/methodos.db`）。
 
 ## 报告生成
 
@@ -265,7 +278,7 @@ Agent 配置通过 `/settings/agent` API 或数据库 settings 表设置：
 GitHub Actions 自动构建 Docker 镜像并推送至 GitHub Container Registry (GHCR)：
 
 - 触发条件：推送到 `master` 分支或 `v*.*.*` 标签
-- 镜像地址：`ghcr.io/<repo>/opencode`
+- 镜像地址：`ghcr.io/<owner>/methodos/opencode`
 - Workflow 文件：`.github/workflows/docker-publish.yml`
 
 ## API
