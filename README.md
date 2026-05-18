@@ -8,13 +8,13 @@
 
 | 维度 | Cairn | Methodos |
 |------|-------|----------|
-| 技术栈 | Python + FastAPI | TypeScript + Fastify |
-| 进程模型 | 双进程：Server（图谱状态）+ Dispatcher（调度），通过 HTTP 通信 | 单进程：HTTP Server 与 Executor Loop 同进程，直接读写 SQLite |
-| 图谱模型 | 三原语：Fact（不可变）+ Intent（租约认领）+ Hint | 两原语：Node + Edge（可变，优先级动态调整） |
-| 执行循环 | Bootstrap → Reason → Explore，Reason 由图谱变化触发 | Plan → Act，Plan 由 edge_drain 或 node_created 触发 |
-| Agent 输出 | Adapter 构建 CLI 命令，解析 stdout 提取 JSON | 写入容器内文件，validateAndFix 机制自动重试修正格式 |
-| 调度策略 | 心跳租约 + Worker 优先级/容量/健康窗口过滤 | 默认随机，可选边优先级（成功提升/失败惩罚/时间衰减）+ claimed_at 过期 |
-| Agent 后端 | Claude Code、Codex、Pi（多 Adapter） | AgentDriver 接口，可扩展 |
+| 技术栈 | Python + FastAPI（Server）+ Docker SDK（Dispatcher） | TypeScript + Fastify + Podman CLI |
+| 进程模型 | 双进程：Server 维护图谱状态，Dispatcher 通过 HTTP 轮询 Server 并调度任务 | 单进程：HTTP 服务与调度循环同进程，共享 SQLite 连接 |
+| 图谱模型 | Fact（已确认发现，不可变）+ Intent（探索方向，通过心跳租约认领）+ Hint（人工提示） | Node（发现）+ Edge（探索方向，含动态优先级和认领超时） |
+| 执行循环 | Reason 分析图谱产出 Intent → Explore 认领 Intent 执行探索产出 Fact | Plan 分析图谱产出 Edge → Act 认领 Edge 执行探索产出 Node |
+| Agent 交互 | Dispatcher 构建 CLI 命令在容器内执行，解析 stdout 提取 JSON | 将 prompt 写入容器内文件，Agent 将结果写入指定文件，读取并校验；校验失败自动重试修正 |
+| 调度策略 | Worker 按容量/健康状态过滤，Intent 通过心跳租约防止重复认领 | 默认随机选取 Edge，可选按优先级排序；Edge 通过认领超时防止永久锁定 |
+| Agent 后端 | WorkerDriver 接口：构建 CLI 参数 + 解析输出，内置 Claude Code / Codex / Pi | AgentDriver 接口：管理执行生命周期，内置 OpenCode / Mock |
 
 ## 架构概览
 
