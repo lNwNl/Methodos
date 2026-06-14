@@ -204,6 +204,8 @@ npm run dev
 
 访问 `http://localhost:3000`。
 
+![项目运行示例](docs/images/screenshot.png)
+
 ### 启动（Mock 模式）
 
 Mock 模式无需容器，使用内置的 MockAgentDriver 模拟 Agent 行为：
