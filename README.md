@@ -2,6 +2,8 @@
 
 自动化渗透测试编排系统。通过 Plan-Act 循环驱动 LLM Agent 自主执行安全测试任务，以有向图（探索图谱）建模探索过程，支持多 Agent 并行执行与优先级调度。
 
+![项目运行示例](docs/images/screenshot.png)
+
 > 本项目受 [Cairn](https://github.com/oritera/Cairn) 启发，借鉴了其以图谱建模探索过程、通过 LLM Agent 自主驱动安全测试的核心思想，同时在架构和技术选型上做了不同的选择。
 
 ### 与 Cairn 的主要差异
@@ -203,8 +205,6 @@ npm run dev
 ```
 
 访问 `http://localhost:3000`。
-
-![项目运行示例](docs/images/screenshot.png)
 
 ### 启动（Mock 模式）
 
